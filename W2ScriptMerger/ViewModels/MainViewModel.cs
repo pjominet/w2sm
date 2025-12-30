@@ -44,9 +44,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _diffViewText = string.Empty;
 
-    public ObservableCollection<ModArchive> LoadedMods { get; } = new();
-    public ObservableCollection<ScriptConflict> Conflicts { get; } = new();
-    public ObservableCollection<string> LogMessages { get; } = new();
+    public ObservableCollection<ModArchive> LoadedMods { get; } = [];
+    public ObservableCollection<ScriptConflict> Conflicts { get; } = [];
+    public ObservableCollection<string> LogMessages { get; } = [];
 
     public MainViewModel()
     {

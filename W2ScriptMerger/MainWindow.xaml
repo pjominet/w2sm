@@ -130,13 +130,6 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
-                <!-- Title -->
-                <StackPanel Grid.Row="0" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,0,0,15">
-                    <TextBlock Text="⚔" FontSize="24" Foreground="#CD853F" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <TextBlock Text="Witcher 2 Script Merger" FontSize="20" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                    <TextBlock Text="v1.0" FontSize="12" Foreground="#888888" VerticalAlignment="Bottom" Margin="10,0,0,3"/>
-                </StackPanel>
-                
                 <!-- Game Path -->
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Game Path:" Foreground="#CCCCCC" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GamePath, Mode=TwoWay}" Style="{StaticResource DarkTextBox}" Margin="0,0,10,0"/>
