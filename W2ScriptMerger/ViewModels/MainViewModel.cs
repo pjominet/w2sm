@@ -64,10 +64,7 @@ public partial class MainViewModel : ObservableObject
         SelectedInstallLocation = _configService.DefaultInstallLocation;
 
         if (!IsGamePathValid)
-        {
-            Log("Game path invalid");
             return;
-        }
 
         Log("Game path validated. Building vanilla script index...");
         Task.Run(() =>
