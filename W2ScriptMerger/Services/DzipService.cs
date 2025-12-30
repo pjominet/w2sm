@@ -10,13 +10,13 @@ public class DzipService
     private const uint DzipMagic = 0x50495A44; // "DZIP"
     private const uint DzipVersion = 2;
 
-    public List<DzipEntry> ReadDzip(string filePath)
+    public static List<DzipEntry> UnpackDzip(string filePath)
     {
         using var stream = File.OpenRead(filePath);
-        return ReadDzip(stream);
+        return UnpackDzip(stream);
     }
 
-    private List<DzipEntry> ReadDzip(Stream? stream)
+    private static List<DzipEntry> UnpackDzip(Stream? stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
         using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true);
@@ -71,9 +71,7 @@ public class DzipService
         stream.ReadExactly(compressedData, 0, (int)entry.CompressedSize);
 
         if (entry.CompressedSize == entry.UncompressedSize)
-        {
             return compressedData;
-        }
 
         // Data is zlib compressed
         using var compressedStream = new MemoryStream(compressedData);
@@ -90,7 +88,7 @@ public class DzipService
     public void ExtractAll(string dzipPath, string outputDirectory)
     {
         using var stream = File.OpenRead(dzipPath);
-        var entries = ReadDzip(stream);
+        var entries = UnpackDzip(stream);
 
         foreach (var entry in entries)
         {
@@ -105,7 +103,7 @@ public class DzipService
         }
     }
 
-    public void CreateDzip(string outputPath, string sourceDirectory)
+    public static void PackDzip(string outputPath, string sourceDirectory)
     {
         var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
         var entries = new List<DzipEntry>();

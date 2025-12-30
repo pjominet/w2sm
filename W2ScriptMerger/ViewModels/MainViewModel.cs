@@ -83,7 +83,7 @@ public partial class MainViewModel : ObservableObject
     {
         var dialog = new OpenFolderDialog
         {
-            Title = "Select Witcher 2 Installation Folder"
+            Title = "Select your Witcher 2 Installation Folder"
         };
 
         if (dialog.ShowDialog() != true) 
@@ -142,7 +142,7 @@ public partial class MainViewModel : ObservableObject
             InitialDirectory = _configService.LastModDirectory
         };
 
-        if (dialog.ShowDialog() == true)
+        if (dialog.ShowDialog() is true)
         {
             IsBusy = true;
             StatusMessage = "Loading mods...";
@@ -182,7 +182,8 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void RemoveMod(ModArchive? mod)
     {
-        if (mod is null) return;
+        if (mod is null) 
+            return;
         
         LoadedMods.Remove(mod);
         Log($"Removed: {mod.FileName}");

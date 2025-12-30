@@ -111,7 +111,7 @@ public class InstallService(ConfigService configService, DzipService dzipService
                 File.WriteAllBytes(filePath, conflict.MergedContent!);
             }
 
-            dzipService.CreateDzip(outputPath, tempDir);
+            DzipService.PackDzip(outputPath, tempDir);
         }
         finally
         {

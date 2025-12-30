@@ -37,10 +37,8 @@ public class MergeService
                 });
 
                 // Mark as requiring merge if multiple mods touch this file
-                if (conflict.ModVersions.Count > 1 || conflict.VanillaContent is not null)
-                {
+                if (conflict.ModVersions.Count > 1 || conflict.VanillaContent is not null) 
                     file.RequiresMerge = true;
-                }
             }
         }
 
@@ -108,9 +106,11 @@ public class MergeService
         var hasConflicts = leftChanges.Intersect(rightChanges).Any();
 
         if (hasConflicts)
-        {
-            return new MergeResult { HasConflicts = true, MergedText = string.Empty };
-        }
+            return new MergeResult
+            {
+                HasConflicts = true,
+                MergedText = string.Empty
+            };
 
         // Apply non-conflicting changes
         var result = new List<string>();

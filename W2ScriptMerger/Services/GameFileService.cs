@@ -21,7 +21,7 @@ public class GameFileService(ConfigService configService, DzipService dzipServic
         {
             try
             {
-                var entries = dzipService.ReadDzip(dzipFile);
+                var entries = DzipService.UnpackDzip(dzipFile);
                 foreach (var entry in entries)
                 {
                     if (!entry.Name.EndsWith(".ws", StringComparison.OrdinalIgnoreCase))
@@ -69,7 +69,7 @@ public class GameFileService(ConfigService configService, DzipService dzipServic
             return File.ReadAllBytes(sourcePath);
         
         // Extract from dzip
-        var entries = dzipService.ReadDzip(sourcePath);
+        var entries = DzipService.UnpackDzip(sourcePath);
         var entry = entries.FirstOrDefault(e => 
             NormalizeScriptPath(e.Name).Equals(key, StringComparison.OrdinalIgnoreCase));
             
