@@ -4,10 +4,10 @@ namespace W2ScriptMerger.Models;
 
 public class ScriptConflict
 {
-    public string RelativePath { get; set; } = string.Empty;
+    public string RelativePath { get; init; } = string.Empty;
     public string FileName => Path.GetFileName(RelativePath);
-    public byte[]? VanillaContent { get; set; }
-    public List<ModFileVersion> ModVersions { get; set; } = new();
+    public byte[]? VanillaContent { get; init; }
+    public List<ModFileVersion> ModVersions { get; } = [];
     public ConflictStatus Status { get; set; } = ConflictStatus.Pending;
     public byte[]? MergedContent { get; set; }
     public bool CanAutoMerge { get; set; }
@@ -15,8 +15,8 @@ public class ScriptConflict
 
 public class ModFileVersion
 {
-    public string SourceArchive { get; set; } = string.Empty;
-    public byte[] Content { get; set; } = Array.Empty<byte>();
+    public string SourceArchive { get; init; } = string.Empty;
+    public byte[] Content { get; init; } = [];
 }
 
 public enum ConflictStatus

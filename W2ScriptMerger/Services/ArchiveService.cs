@@ -16,7 +16,7 @@ public class ArchiveService
         return SupportedExtensions.Contains(ext);
     }
 
-    public ModArchive LoadModArchive(string archivePath)
+    public static ModArchive LoadModArchive(string archivePath)
     {
         var modArchive = new ModArchive
         {
@@ -60,7 +60,7 @@ public class ArchiveService
     public List<ModFile> GetScriptFiles(ModArchive archive)
     {
         return archive.Files
-            .Where(f => f.FileType == ModFileType.Script || f.FileType == ModFileType.Dzip)
+            .Where(f => f.FileType is ModFileType.Script or ModFileType.Dzip)
             .ToList();
     }
 

@@ -2,10 +2,10 @@ namespace W2ScriptMerger.Models;
 
 public class DzipEntry
 {
-    public string Name { get; set; } = string.Empty;
-    public DateTime TimeStamp { get; set; }
-    public long UncompressedSize { get; set; }
-    public long Offset { get; set; }
-    public long CompressedSize { get; set; }
+    public string Name { get; init; } = string.Empty;
+    public DateTime TimeStamp { get; init; }
+    public long UncompressedSize { get; init; }
+    public long Offset { get; init; }
+    public long CompressedSize { get; init; }
     public byte[]? Data { get; set; }
 }

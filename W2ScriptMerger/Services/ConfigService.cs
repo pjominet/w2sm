@@ -7,23 +7,21 @@ namespace W2ScriptMerger.Services;
 public class ConfigService
 {
     private readonly string _configPath;
-    private AppConfig _config;
+    private AppConfig Config { get; }
 
     public ConfigService()
     {
         var exeLocation = AppDomain.CurrentDomain.BaseDirectory;
         _configPath = Path.Combine(exeLocation, "config.json");
-        _config = Load();
+        Config = Load();
     }
-
-    public AppConfig Config => _config;
 
     public string? GamePath
     {
-        get => _config.GamePath;
+        get => Config.GamePath;
         set
         {
-            _config.GamePath = value;
+            Config.GamePath = value;
             Save();
         }
     }
@@ -32,66 +30,58 @@ public class ConfigService
     {
         get
         {
-            if (!string.IsNullOrEmpty(_config.UserContentPath))
-                return _config.UserContentPath;
+            if (!string.IsNullOrEmpty(Config.UserContentPath))
+                return Config.UserContentPath;
             
             var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             return Path.Combine(docs, "Witcher 2", "UserContent");
         }
         set
         {
-            _config.UserContentPath = value;
+            Config.UserContentPath = value;
             Save();
         }
     }
 
-    public string? CookedPCPath
-    {
-        get
-        {
-            if (string.IsNullOrEmpty(_config.GamePath))
-                return null;
-            return Path.Combine(_config.GamePath, "CookedPC");
-        }
-    }
+    public string? CookedPCPath => string.IsNullOrEmpty(Config.GamePath) ? null : Path.Combine(Config.GamePath, "CookedPC");
 
     public InstallLocation DefaultInstallLocation
     {
-        get => _config.DefaultInstallLocation;
+        get => Config.DefaultInstallLocation;
         set
         {
-            _config.DefaultInstallLocation = value;
+            Config.DefaultInstallLocation = value;
             Save();
         }
     }
 
     public string? LastModDirectory
     {
-        get => _config.LastModDirectory;
+        get => Config.LastModDirectory;
         set
         {
-            _config.LastModDirectory = value;
+            Config.LastModDirectory = value;
             Save();
         }
     }
 
     public bool IsGamePathValid()
     {
-        if (string.IsNullOrEmpty(_config.GamePath))
+        if (string.IsNullOrEmpty(Config.GamePath))
             return false;
 
-        var witcher2Exe = Path.Combine(_config.GamePath, "bin", "witcher2.exe");
-        var cookedPC = Path.Combine(_config.GamePath, "CookedPC");
+        var witcher2Exe = Path.Combine(Config.GamePath, "bin", "witcher2.exe");
+        var cookedPC = Path.Combine(Config.GamePath, "CookedPC");
         
         return File.Exists(witcher2Exe) || Directory.Exists(cookedPC);
     }
 
     public void AddRecentMod(string path)
     {
-        _config.RecentMods.Remove(path);
-        _config.RecentMods.Insert(0, path);
-        if (_config.RecentMods.Count > 10)
-            _config.RecentMods = _config.RecentMods.Take(10).ToList();
+        Config.RecentMods.Remove(path);
+        Config.RecentMods.Insert(0, path);
+        if (Config.RecentMods.Count > 10)
+            Config.RecentMods = Config.RecentMods.Take(10).ToList();
         Save();
     }
 
@@ -112,11 +102,11 @@ public class ConfigService
         return new AppConfig();
     }
 
-    public void Save()
+    private void Save()
     {
         try
         {
-            var json = JsonConvert.SerializeObject(_config, Formatting.Indented);
+            var json = JsonConvert.SerializeObject(Config, Formatting.Indented);
             File.WriteAllText(_configPath, json);
         }
         catch

@@ -6,8 +6,8 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <UseWPF>true</UseWPF>
-                <Title>Witcher 2 Script Merger</Title>
-        <Description>A script merger and mod manager for The Witcher 2</Description>
+        <Title>Witcher 2 Mod/Script Manager</Title>
+        <Description>A mod manager and script merger for The Witcher 2</Description>
     </PropertyGroup>
 
     <ItemGroup>

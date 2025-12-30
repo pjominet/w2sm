@@ -3,23 +3,14 @@ using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
-public class InstallService
+public class InstallService(ConfigService configService, DzipService dzipService)
 {
-    private readonly ConfigService _configService;
-    private readonly DzipService _dzipService;
-
-    public InstallService(ConfigService configService, DzipService dzipService)
-    {
-        _configService = configService;
-        _dzipService = dzipService;
-    }
-
-    public string GetInstallPath(InstallLocation location)
+    private string GetInstallPath(InstallLocation location)
     {
         return location switch
         {
-            InstallLocation.UserContent => _configService.UserContentPath,
-            InstallLocation.CookedPC => _configService.CookedPCPath ?? throw new InvalidOperationException("Game path not set"),
+            InstallLocation.UserContent => configService.UserContentPath,
+            InstallLocation.CookedPC => configService.CookedPCPath ?? throw new InvalidOperationException("Game path not set"),
             _ => throw new ArgumentOutOfRangeException(nameof(location))
         };
     }
@@ -120,7 +111,7 @@ public class InstallService
                 File.WriteAllBytes(filePath, conflict.MergedContent!);
             }
 
-            _dzipService.CreateDzip(outputPath, tempDir);
+            dzipService.CreateDzip(outputPath, tempDir);
         }
         finally
         {

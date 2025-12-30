@@ -63,19 +63,22 @@ public partial class MainViewModel : ObservableObject
         IsGamePathValid = _configService.IsGamePathValid();
         SelectedInstallLocation = _configService.DefaultInstallLocation;
 
-        if (IsGamePathValid)
+        if (!IsGamePathValid)
         {
-            Log("Game path validated. Building vanilla script index...");
-            Task.Run(() =>
-            {
-                _gameFileService.BuildVanillaIndex();
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    Log($"Indexed {_gameFileService.GetAllVanillaScriptPaths().Count} vanilla scripts");
-                    StatusMessage = "Ready - Vanilla scripts indexed";
-                });
-            });
+            Log("Game path invalid");
+            return;
         }
+
+        Log("Game path validated. Building vanilla script index...");
+        Task.Run(() =>
+        {
+            _gameFileService.BuildVanillaIndex();
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                Log($"Indexed {_gameFileService.GetAllVanillaScriptPaths().Count} vanilla scripts");
+                StatusMessage = "Ready - Vanilla scripts indexed";
+            });
+        });
     }
 
     [RelayCommand]
@@ -86,32 +89,32 @@ public partial class MainViewModel : ObservableObject
             Title = "Select Witcher 2 Installation Folder"
         };
 
-        if (dialog.ShowDialog() == true)
-        {
-            GamePath = dialog.FolderName;
-            _configService.GamePath = GamePath;
-            IsGamePathValid = _configService.IsGamePathValid();
+        if (dialog.ShowDialog() != true) 
+            return;
+        
+        GamePath = dialog.FolderName;
+        _configService.GamePath = GamePath;
+        IsGamePathValid = _configService.IsGamePathValid();
 
-            if (IsGamePathValid)
-            {
-                Log($"Game path set: {GamePath}");
-                UserContentPath = _configService.UserContentPath;
+        if (IsGamePathValid)
+        {
+            Log($"Game path set: {GamePath}");
+            UserContentPath = _configService.UserContentPath;
                 
-                Task.Run(() =>
-                {
-                    _gameFileService.BuildVanillaIndex();
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        Log($"Indexed {_gameFileService.GetAllVanillaScriptPaths().Count} vanilla scripts");
-                        StatusMessage = "Ready - Vanilla scripts indexed";
-                    });
-                });
-            }
-            else
+            Task.Run(() =>
             {
-                Log("Warning: Selected path does not appear to be a valid Witcher 2 installation");
-                StatusMessage = "Invalid game path";
-            }
+                _gameFileService.BuildVanillaIndex();
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Log($"Indexed {_gameFileService.GetAllVanillaScriptPaths().Count} vanilla scripts");
+                    StatusMessage = "Ready - Vanilla scripts indexed";
+                });
+            });
+        }
+        else
+        {
+            Log("Warning: Selected path does not appear to be a valid Witcher 2 installation");
+            StatusMessage = "Invalid game path";
         }
     }
 
@@ -123,12 +126,12 @@ public partial class MainViewModel : ObservableObject
             Title = "Select UserContent Folder"
         };
 
-        if (dialog.ShowDialog() == true)
-        {
-            UserContentPath = dialog.FolderName;
-            _configService.UserContentPath = UserContentPath;
-            Log($"UserContent path set: {UserContentPath}");
-        }
+        if (dialog.ShowDialog() != true) 
+            return;
+        
+        UserContentPath = dialog.FolderName;
+        _configService.UserContentPath = UserContentPath;
+        Log($"UserContent path set: {UserContentPath}");
     }
 
     [RelayCommand]
@@ -155,7 +158,7 @@ public partial class MainViewModel : ObservableObject
             {
                 Log($"Loading: {Path.GetFileName(file)}");
                 
-                var archive = await Task.Run(() => _archiveService.LoadModArchive(file));
+                var archive = await Task.Run(() => ArchiveService.LoadModArchive(file));
                 
                 if (archive.IsLoaded)
                 {
@@ -211,7 +214,7 @@ public partial class MainViewModel : ObservableObject
             return;
 
         var conflicts = await Task.Run(() => 
-            _mergeService.DetectConflicts(LoadedMods.ToList(), _gameFileService));
+            MergeService.DetectConflicts(LoadedMods.ToList(), _gameFileService));
 
         foreach (var conflict in conflicts)
         {
@@ -238,19 +241,19 @@ public partial class MainViewModel : ObservableObject
 
         foreach (var conflict in Conflicts)
         {
-            if (conflict.Status == ConflictStatus.Pending)
+            if (conflict.Status is not ConflictStatus.Pending) 
+                continue;
+            
+            var success = await Task.Run(() => _mergeService.TryAutoMerge(conflict));
+            if (success)
             {
-                var success = await Task.Run(() => _mergeService.TryAutoMerge(conflict));
-                if (success)
-                {
-                    autoMerged++;
-                    Log($"Auto-merged: {conflict.FileName}");
-                }
-                else
-                {
-                    failed++;
-                    Log($"Needs manual merge: {conflict.FileName}");
-                }
+                autoMerged++;
+                Log($"Auto-merged: {conflict.FileName}");
+            }
+            else
+            {
+                failed++;
+                Log($"Needs manual merge: {conflict.FileName}");
             }
         }
 
@@ -302,23 +305,23 @@ public partial class MainViewModel : ObservableObject
             Owner = Application.Current.MainWindow
         };
 
-        if (mergeWindow.ShowDialog() == true && mergeWindow.MergeAccepted)
-        {
-            SelectedConflict.MergedContent = mergeWindow.MergedContent;
-            SelectedConflict.Status = ConflictStatus.ManuallyMerged;
-            Log($"Manually merged: {SelectedConflict.FileName}");
-            StatusMessage = $"Merged: {SelectedConflict.FileName}";
+        if (mergeWindow.ShowDialog() != true || !mergeWindow.MergeAccepted) 
+            return;
+        
+        SelectedConflict.MergedContent = mergeWindow.MergedContent;
+        SelectedConflict.Status = ConflictStatus.ManuallyMerged;
+        Log($"Manually merged: {SelectedConflict.FileName}");
+        StatusMessage = $"Merged: {SelectedConflict.FileName}";
             
-            // Refresh the conflict list to update status indicators
-            var index = Conflicts.IndexOf(SelectedConflict);
-            if (index >= 0)
-            {
-                var conflict = SelectedConflict;
-                Conflicts.RemoveAt(index);
-                Conflicts.Insert(index, conflict);
-                SelectedConflict = conflict;
-            }
-        }
+        // Refresh the conflict list to update status indicators
+        var index = Conflicts.IndexOf(SelectedConflict);
+        if (index < 0) 
+            return;
+            
+        var conflict = SelectedConflict;
+        Conflicts.RemoveAt(index);
+        Conflicts.Insert(index, conflict);
+        SelectedConflict = conflict;
     }
 
     [RelayCommand]
@@ -331,7 +334,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         var pendingConflicts = Conflicts.Where(c => c.Status == ConflictStatus.Pending).ToList();
-        if (pendingConflicts.Any())
+        if (pendingConflicts.Count != 0)
         {
             var result = MessageBox.Show(
                 $"There are {pendingConflicts.Count} unresolved conflicts. Continue anyway?",
@@ -339,7 +342,7 @@ public partial class MainViewModel : ObservableObject
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
 
-            if (result != MessageBoxResult.Yes)
+            if (result is not MessageBoxResult.Yes)
                 return;
         }
 
@@ -382,10 +385,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    partial void OnSelectedInstallLocationChanged(InstallLocation value)
-    {
-        _configService.DefaultInstallLocation = value;
-    }
+    partial void OnSelectedInstallLocationChanged(InstallLocation value) => _configService.DefaultInstallLocation = value;
 
     private void Log(string message)
     {

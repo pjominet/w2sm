@@ -6,7 +6,7 @@ public class AppConfig
     public string? UserContentPath { get; set; }
     public string? LastModDirectory { get; set; }
     public InstallLocation DefaultInstallLocation { get; set; } = InstallLocation.UserContent;
-    public List<string> RecentMods { get; set; } = new();
+    public List<string> RecentMods { get; set; } = [];
 }
 
 public enum InstallLocation

@@ -16,8 +16,9 @@ public class DzipService
         return ReadDzip(stream);
     }
 
-    public List<DzipEntry> ReadDzip(Stream stream)
+    private List<DzipEntry> ReadDzip(Stream? stream)
     {
+        ArgumentNullException.ThrowIfNull(stream);
         using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true);
         
         var magic = reader.ReadUInt32();
@@ -36,7 +37,7 @@ public class DzipService
         var entries = new List<DzipEntry>();
         stream.Seek(entryTableOffset, SeekOrigin.Begin);
 
-        for (int i = 0; i < entryCount; i++)
+        for (var i = 0; i < entryCount; i++)
         {
             var nameLength = reader.ReadUInt16();
             var nameBytes = reader.ReadBytes(nameLength);
@@ -56,14 +57,15 @@ public class DzipService
         return entries;
     }
 
-    public byte[] ExtractEntry(string dzipPath, DzipEntry entry)
+    public static byte[] ExtractEntry(string dzipPath, DzipEntry entry)
     {
         using var stream = File.OpenRead(dzipPath);
         return ExtractEntry(stream, entry);
     }
 
-    public byte[] ExtractEntry(Stream stream, DzipEntry entry)
+    private static byte[] ExtractEntry(Stream? stream, DzipEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(stream);
         stream.Seek(entry.Offset, SeekOrigin.Begin);
         var compressedData = new byte[entry.CompressedSize];
         stream.ReadExactly(compressedData, 0, (int)entry.CompressedSize);
@@ -186,7 +188,7 @@ public class DzipService
         writer.Write(hash);
     }
 
-    private ulong CalculateEntriesHash(List<DzipEntry> entries)
+    private static ulong CalculateEntriesHash(List<DzipEntry> entries)
     {
         var hash = 0x00000000FFFFFFFFUL;
         foreach (var entry in entries)

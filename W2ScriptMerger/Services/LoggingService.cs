@@ -5,20 +5,20 @@ namespace W2ScriptMerger.Services;
 
 public class LoggingService
 {
-    private readonly string _logsDirectory;
-    private readonly string _runLogPath;
     private readonly string _currentLogPath;
-    private readonly object _lock = new();
+    private string LogsDirectory { get; }
+    private string CurrentLogFile { get; }
+    private readonly Lock _lock = new();
 
     public LoggingService()
     {
         var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        _logsDirectory = Path.Combine(baseDirectory, "log");
-        Directory.CreateDirectory(_logsDirectory);
+        LogsDirectory = Path.Combine(baseDirectory, "log");
+        Directory.CreateDirectory(LogsDirectory);
 
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        _runLogPath = Path.Combine(_logsDirectory, $"log_{timestamp}.txt");
-        _currentLogPath = Path.Combine(_logsDirectory, "current.log");
+        CurrentLogFile = Path.Combine(LogsDirectory, $"log_{timestamp}.txt");
+        _currentLogPath = Path.Combine(LogsDirectory, "current.log");
         if (File.Exists(_currentLogPath))
         {
             File.Delete(_currentLogPath);
@@ -27,9 +27,6 @@ public class LoggingService
         var header = $"=== Witcher 2 Script Merger started {DateTime.Now:G} ===";
         WriteLine(header);
     }
-
-    public string LogsDirectory => _logsDirectory;
-    public string CurrentLogFile => _runLogPath;
 
     public void Log(string message)
     {
@@ -40,7 +37,7 @@ public class LoggingService
     {
         lock (_lock)
         {
-            File.AppendAllText(_runLogPath, line + Environment.NewLine, Encoding.UTF8);
+            File.AppendAllText(CurrentLogFile, line + Environment.NewLine, Encoding.UTF8);
             File.AppendAllText(_currentLogPath, line + Environment.NewLine, Encoding.UTF8);
         }
     }

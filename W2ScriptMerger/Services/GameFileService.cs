@@ -3,23 +3,15 @@ using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
-public class GameFileService
+public class GameFileService(ConfigService configService, DzipService dzipService)
 {
-    private readonly ConfigService _configService;
-    private readonly DzipService _dzipService;
     private Dictionary<string, string>? _vanillaScriptIndex;
-
-    public GameFileService(ConfigService configService, DzipService dzipService)
-    {
-        _configService = configService;
-        _dzipService = dzipService;
-    }
 
     public void BuildVanillaIndex()
     {
         _vanillaScriptIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        var cookedPcPath = _configService.CookedPCPath;
+        var cookedPcPath = configService.CookedPCPath;
         if (string.IsNullOrEmpty(cookedPcPath) || !Directory.Exists(cookedPcPath))
             return;
 
@@ -29,17 +21,14 @@ public class GameFileService
         {
             try
             {
-                var entries = _dzipService.ReadDzip(dzipFile);
+                var entries = dzipService.ReadDzip(dzipFile);
                 foreach (var entry in entries)
                 {
-                    if (entry.Name.EndsWith(".ws", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var key = NormalizeScriptPath(entry.Name);
-                        if (!_vanillaScriptIndex.ContainsKey(key))
-                        {
-                            _vanillaScriptIndex[key] = dzipFile;
-                        }
-                    }
+                    if (!entry.Name.EndsWith(".ws", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    
+                    var key = NormalizeScriptPath(entry.Name);
+                    _vanillaScriptIndex.TryAdd(key, dzipFile);
                 }
             }
             catch
@@ -54,10 +43,7 @@ public class GameFileService
         {
             var relativePath = Path.GetRelativePath(cookedPcPath, wsFile);
             var key = NormalizeScriptPath(relativePath);
-            if (!_vanillaScriptIndex.ContainsKey(key))
-            {
-                _vanillaScriptIndex[key] = wsFile;
-            }
+            _vanillaScriptIndex.TryAdd(key, wsFile);
         }
     }
 
@@ -79,24 +65,15 @@ public class GameFileService
         if (!_vanillaScriptIndex!.TryGetValue(key, out var sourcePath))
             return null;
 
-        if (sourcePath.EndsWith(".dzip", StringComparison.OrdinalIgnoreCase))
-        {
-            // Extract from dzip
-            var entries = _dzipService.ReadDzip(sourcePath);
-            var entry = entries.FirstOrDefault(e => 
-                NormalizeScriptPath(e.Name).Equals(key, StringComparison.OrdinalIgnoreCase));
-            
-            if (entry is not null)
-            {
-                return _dzipService.ExtractEntry(sourcePath, entry);
-            }
-            return null;
-        }
-        else
-        {
-            // Read loose file
+        if (!sourcePath.EndsWith(".dzip", StringComparison.OrdinalIgnoreCase)) 
             return File.ReadAllBytes(sourcePath);
-        }
+        
+        // Extract from dzip
+        var entries = dzipService.ReadDzip(sourcePath);
+        var entry = entries.FirstOrDefault(e => 
+            NormalizeScriptPath(e.Name).Equals(key, StringComparison.OrdinalIgnoreCase));
+            
+        return entry is not null ? DzipService.ExtractEntry(sourcePath, entry) : null;
     }
 
     public HashSet<string> GetAllVanillaScriptPaths()
@@ -112,18 +89,15 @@ public class GameFileService
         var mods = new List<string>();
 
         // Check UserContent
-        var userContentPath = _configService.UserContentPath;
-        if (Directory.Exists(userContentPath))
-        {
-            mods.AddRange(Directory.GetDirectories(userContentPath));
-            mods.AddRange(Directory.GetFiles(userContentPath, "*.dzip"));
-        }
+        var userContentPath = configService.UserContentPath;
+        if (!Directory.Exists(userContentPath)) 
+            return mods;
+        
+        mods.AddRange(Directory.GetDirectories(userContentPath));
+        mods.AddRange(Directory.GetFiles(userContentPath, "*.dzip"));
 
         return mods;
     }
 
-    private static string NormalizeScriptPath(string path)
-    {
-        return path.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
-    }
+    private static string NormalizeScriptPath(string path) => path.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
 }

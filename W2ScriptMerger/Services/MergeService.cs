@@ -10,7 +10,7 @@ public class MergeService
 {
     private readonly Differ _differ = new();
 
-    public List<ScriptConflict> DetectConflicts(List<ModArchive> archives, GameFileService gameFileService)
+    public static List<ScriptConflict> DetectConflicts(List<ModArchive> archives, GameFileService gameFileService)
     {
         var conflicts = new Dictionary<string, ScriptConflict>(StringComparer.OrdinalIgnoreCase);
 
@@ -53,19 +53,19 @@ public class MergeService
 
     public bool TryAutoMerge(ScriptConflict conflict)
     {
-        if (conflict.ModVersions.Count == 0)
-            return false;
-
-        // If only one mod and no vanilla, just use that mod's version
-        if (conflict.ModVersions.Count == 1 && conflict.VanillaContent is null)
+        switch (conflict.ModVersions.Count)
         {
-            conflict.MergedContent = conflict.ModVersions[0].Content;
-            conflict.Status = ConflictStatus.AutoMerged;
-            conflict.CanAutoMerge = true;
-            return true;
+            case 0:
+                return false;
+            // If only one mod and no vanilla, just use that mod's version
+            case 1 when conflict.VanillaContent is null:
+                conflict.MergedContent = conflict.ModVersions[0].Content;
+                conflict.Status = ConflictStatus.AutoMerged;
+                conflict.CanAutoMerge = true;
+                return true;
         }
 
-        var baseContent = conflict.VanillaContent ?? Array.Empty<byte>();
+        var baseContent = conflict.VanillaContent ?? [];
         var baseText = Encoding.UTF8.GetString(baseContent);
 
         // Try three-way merge for each mod version
@@ -92,7 +92,7 @@ public class MergeService
         return true;
     }
 
-    public MergeResult ThreeWayMerge(string baseText, string leftText, string rightText)
+    private MergeResult ThreeWayMerge(string baseText, string leftText, string rightText)
     {
         var baseLines = baseText.Split('\n');
         var leftLines = leftText.Split('\n');
@@ -132,28 +132,23 @@ public class MergeService
                 // Use left version
                 if (leftLineIndex < leftLines.Length)
                     result.Add(leftLines[leftLineIndex]);
-                leftLineIndex++;
-                rightLineIndex++;
-                baseLineIndex++;
             }
             else if (rightHasChange && !leftHasChange)
             {
                 // Use right version
                 if (rightLineIndex < rightLines.Length)
                     result.Add(rightLines[rightLineIndex]);
-                leftLineIndex++;
-                rightLineIndex++;
-                baseLineIndex++;
             }
             else
             {
                 // No change or both same, use base/left
                 if (baseLineIndex < baseLines.Length)
                     result.Add(baseLines[baseLineIndex]);
-                leftLineIndex++;
-                rightLineIndex++;
-                baseLineIndex++;
             }
+
+            leftLineIndex++;
+            rightLineIndex++;
+            baseLineIndex++;
         }
 
         return new MergeResult
@@ -163,13 +158,13 @@ public class MergeService
         };
     }
 
-    private HashSet<int> GetChangedLineNumbers(DiffPlex.Model.DiffResult diff)
+    private static HashSet<int> GetChangedLineNumbers(DiffPlex.Model.DiffResult diff)
     {
         var changed = new HashSet<int>();
 
         foreach (var block in diff.DiffBlocks)
         {
-            for (int i = block.DeleteStartA; i < block.DeleteStartA + block.DeleteCountA; i++)
+            for (var i = block.DeleteStartA; i < block.DeleteStartA + block.DeleteCountA; i++)
             {
                 changed.Add(i);
             }
@@ -210,13 +205,13 @@ public class MergeService
 
 public class MergeResult
 {
-    public bool HasConflicts { get; set; }
-    public string MergedText { get; set; } = string.Empty;
+    public bool HasConflicts { get; init; }
+    public string MergedText { get; init; } = string.Empty;
 }
 
 public class DiffReport
 {
-    public List<DiffLine> Lines { get; set; } = new();
+    public List<DiffLine> Lines { get; set; } = [];
 }
 
 public class DiffLine
