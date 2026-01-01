@@ -14,7 +14,6 @@ namespace W2ScriptMerger.ViewModels;
 public partial class MainViewModel : ObservableObject
 {
     private readonly ConfigService _configService;
-    private readonly ArchiveService _archiveService;
     private readonly GameFileService _gameFileService;
     private readonly MergeService _mergeService;
     private readonly InstallService _installService;
@@ -47,12 +46,12 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<ModArchive> LoadedMods { get; } = [];
     public ObservableCollection<ScriptConflict> Conflicts { get; } = [];
     public ObservableCollection<string> LogMessages { get; } = [];
+    public InstallLocation[] InstallLocations { get; } = Enum.GetValues<InstallLocation>();
 
     public MainViewModel()
     {
         _configService = new ConfigService();
         _loggingService = new LoggingService();
-        _archiveService = new ArchiveService();
         var dzipService = new DzipService();
         _gameFileService = new GameFileService(_configService, dzipService);
         _mergeService = new MergeService();

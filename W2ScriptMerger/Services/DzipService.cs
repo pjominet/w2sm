@@ -5,17 +5,29 @@ using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
+/// <summary>
+/// Low-level helper for reading and writing Witcher 2 <c>.dzip</c> archives.
+/// The format is a container similar to ZIP but with its own header/table layout.
+/// </summary>
 public class DzipService
 {
-    private const uint DzipMagic = 0x50495A44; // "DZIP"
+    // Magic number stored at the beginning of every Witcher 2 DZIP archive ("DZIP" as ASCII).
+    // Validating this prevents us from trying to parse non-DZIP data with the custom layout.
+    private const uint DzipMagic = 0x50495A44;
     private const uint DzipVersion = 2;
 
+    /// <summary>
+    /// Reads every entry in a <c>.dzip</c> file and returns metadata for them.
+    /// </summary>
     public static List<DzipEntry> UnpackDzip(string filePath)
     {
         using var stream = File.OpenRead(filePath);
         return UnpackDzip(stream);
     }
 
+    /// <summary>
+    /// Core reader that walks the DZIP header and entry table from an open stream.
+    /// </summary>
     private static List<DzipEntry> UnpackDzip(Stream? stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -32,7 +44,10 @@ public class DzipService
         var entryCount = reader.ReadUInt32();
         reader.ReadUInt32(); // unknown/padding
         var entryTableOffset = reader.ReadInt64();
-        var entryTableHash = reader.ReadUInt64();
+        // part of the DZIP header (an 8-byte checksum recorded after writing the entry table), but CDPR’s tools never validate it when reading.
+        // Witcher 2’s runtime ignores it too: only the header fields (count, offsets, etc.) are required to load a dzip. Because the hash is effectively informational/legacy,
+        // the current reader just advances past it and does not use it anywhere else.
+        _ = reader.ReadUInt64();
 
         var entries = new List<DzipEntry>();
         stream.Seek(entryTableOffset, SeekOrigin.Begin);
@@ -57,12 +72,18 @@ public class DzipService
         return entries;
     }
 
+    /// <summary>
+    /// Extracts a single entry from a <c>.dzip</c> given its metadata.
+    /// </summary>
     public static byte[] ExtractEntry(string dzipPath, DzipEntry entry)
     {
         using var stream = File.OpenRead(dzipPath);
         return ExtractEntry(stream, entry);
     }
 
+    /// <summary>
+    /// Reads the raw bytes of an entry, inflating zlib-compressed payloads when needed.
+    /// </summary>
     private static byte[] ExtractEntry(Stream? stream, DzipEntry entry)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -85,7 +106,10 @@ public class DzipService
         return resultStream.ToArray();
     }
 
-    public void ExtractAll(string dzipPath, string outputDirectory)
+    /// <summary>
+    /// Extracts every entry in the archive to a directory tree, preserving timestamps.
+    /// </summary>
+    public static void ExtractAll(string dzipPath, string outputDirectory)
     {
         using var stream = File.OpenRead(dzipPath);
         var entries = UnpackDzip(stream);
@@ -103,6 +127,9 @@ public class DzipService
         }
     }
 
+    /// <summary>
+    /// Packs every file beneath <paramref name="sourceDirectory"/> into a new <c>.dzip</c>.
+    /// </summary>
     public static void PackDzip(string outputPath, string sourceDirectory)
     {
         var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
@@ -186,8 +213,12 @@ public class DzipService
         writer.Write(hash);
     }
 
+    /// <summary>
+    /// Reproduces the hash stored in Witcher 2 dzips; used when writing headers.
+    /// </summary>
     private static ulong CalculateEntriesHash(List<DzipEntry> entries)
     {
+        // Hash seed used by CDPR tooling (matches FNV-1 variant observed in shipped assets).
         var hash = 0x00000000FFFFFFFFUL;
         foreach (var entry in entries)
         {
@@ -195,20 +226,20 @@ public class DzipService
             {
                 foreach (var c in entry.Name)
                 {
-                    hash ^= (byte)c;
-                    hash *= 0x00000100000001B3UL;
+                    hash ^= (byte)c;                      // fold each path character
+                    hash *= 0x00000100000001B3UL;         // multiply by FNV prime
                 }
-                hash ^= (ulong)entry.Name.Length;
+                hash ^= (ulong)entry.Name.Length;         // include name length to differentiate same chars/order
                 hash *= 0x00000100000001B3UL;
             }
 
-            hash ^= (ulong)entry.TimeStamp.ToFileTime();
+            hash ^= (ulong)entry.TimeStamp.ToFileTime();  // bake in last-write time
             hash *= 0x00000100000001B3UL;
-            hash ^= (ulong)entry.UncompressedSize;
+            hash ^= (ulong)entry.UncompressedSize;        // uncompressed payload size
             hash *= 0x00000100000001B3UL;
-            hash ^= (ulong)entry.Offset;
+            hash ^= (ulong)entry.Offset;                  // file position inside the archive
             hash *= 0x00000100000001B3UL;
-            hash ^= (ulong)entry.CompressedSize;
+            hash ^= (ulong)entry.CompressedSize;          // compressed payload size
             hash *= 0x00000100000001B3UL;
         }
         return hash;

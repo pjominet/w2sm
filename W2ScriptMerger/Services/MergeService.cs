@@ -173,57 +173,11 @@ public class MergeService
         return changed;
     }
 
-    public DiffReport GenerateDiffReport(byte[] original, byte[] modified)
-    {
-        var originalText = Encoding.UTF8.GetString(original);
-        var modifiedText = Encoding.UTF8.GetString(modified);
-
-        var diffBuilder = new InlineDiffBuilder(_differ);
-        var diff = diffBuilder.BuildDiffModel(originalText, modifiedText);
-
-        return new DiffReport
-        {
-            Lines = diff.Lines.Select(l => new DiffLine
-            {
-                Text = l.Text,
-                Type = l.Type switch
-                {
-                    ChangeType.Inserted => DiffLineType.Added,
-                    ChangeType.Deleted => DiffLineType.Removed,
-                    ChangeType.Modified => DiffLineType.Modified,
-                    _ => DiffLineType.Unchanged
-                }
-            }).ToList()
-        };
-    }
-
-    private static string NormalizePath(string path)
-    {
-        return path.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
-    }
+    private static string NormalizePath(string path) => path.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
 }
 
 public class MergeResult
 {
     public bool HasConflicts { get; init; }
     public string MergedText { get; init; } = string.Empty;
-}
-
-public class DiffReport
-{
-    public List<DiffLine> Lines { get; set; } = [];
-}
-
-public class DiffLine
-{
-    public string Text { get; set; } = string.Empty;
-    public DiffLineType Type { get; set; }
-}
-
-public enum DiffLineType
-{
-    Unchanged,
-    Added,
-    Removed,
-    Modified
 }
