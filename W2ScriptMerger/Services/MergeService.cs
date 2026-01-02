@@ -1,7 +1,6 @@
 using System.Text;
 using DiffPlex;
 using DiffPlex.DiffBuilder;
-using DiffPlex.DiffBuilder.Model;
 using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
@@ -19,7 +18,7 @@ public class MergeService
             foreach (var file in archive.Files.Where(f => f.FileType == ModFileType.Script))
             {
                 var key = NormalizePath(file.RelativePath);
-                
+
                 if (!conflicts.TryGetValue(key, out var conflict))
                 {
                     conflict = new ScriptConflict
@@ -37,8 +36,9 @@ public class MergeService
                 });
 
                 // Mark as requiring merge if multiple mods touch this file
-                if (conflict.ModVersions.Count > 1 || conflict.VanillaContent is not null) 
-                    file.RequiresMerge = true;
+                if (conflict.ModVersions.Count > 1 || conflict.VanillaContent is not null)
+                {
+                }
             }
         }
 
@@ -59,7 +59,6 @@ public class MergeService
             case 1 when conflict.VanillaContent is null:
                 conflict.MergedContent = conflict.ModVersions[0].Content;
                 conflict.Status = ConflictStatus.AutoMerged;
-                conflict.CanAutoMerge = true;
                 return true;
         }
 
@@ -68,25 +67,23 @@ public class MergeService
 
         // Try three-way merge for each mod version
         var currentMerged = baseText;
-        
+
         foreach (var modVersion in conflict.ModVersions)
         {
             var modText = Encoding.UTF8.GetString(modVersion.Content);
-            
+
             var mergeResult = ThreeWayMerge(baseText, currentMerged, modText);
             if (mergeResult.HasConflicts)
             {
-                conflict.CanAutoMerge = false;
                 conflict.Status = ConflictStatus.Pending;
                 return false;
             }
-            
+
             currentMerged = mergeResult.MergedText;
         }
 
         conflict.MergedContent = Encoding.UTF8.GetBytes(currentMerged);
         conflict.Status = ConflictStatus.AutoMerged;
-        conflict.CanAutoMerge = true;
         return true;
     }
 

@@ -9,7 +9,7 @@ namespace W2ScriptMerger.Services;
 /// Low-level helper for reading and writing Witcher 2 <c>.dzip</c> archives.
 /// The format is a container similar to ZIP but with its own header/table layout.
 /// </summary>
-public class DzipService
+public static class DzipService
 {
     // Magic number stored at the beginning of every Witcher 2 DZIP archive ("DZIP" as ASCII).
     // Validating this prevents us from trying to parse non-DZIP data with the custom layout.
@@ -32,7 +32,7 @@ public class DzipService
     {
         ArgumentNullException.ThrowIfNull(stream);
         using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true);
-        
+
         var magic = reader.ReadUInt32();
         if (magic != DzipMagic)
             throw new InvalidDataException($"Invalid DZIP magic: expected 0x{DzipMagic:X8}, got 0x{magic:X8}");
@@ -99,7 +99,7 @@ public class DzipService
         // Skip zlib header (2 bytes)
         compressedStream.ReadByte();
         compressedStream.ReadByte();
-        
+
         using var deflateStream = new DeflateStream(compressedStream, CompressionMode.Decompress);
         using var resultStream = new MemoryStream();
         deflateStream.CopyTo(resultStream);
@@ -157,12 +157,12 @@ public class DzipService
                 // Write zlib header
                 compressedStream.WriteByte(0x78);
                 compressedStream.WriteByte(0x9C);
-                
+
                 using (var deflateStream = new DeflateStream(compressedStream, CompressionLevel.Optimal, leaveOpen: true))
                 {
                     deflateStream.Write(fileData, 0, fileData.Length);
                 }
-                
+
                 dataToWrite = compressedStream.ToArray();
                 compressedSize = dataToWrite.Length;
             }

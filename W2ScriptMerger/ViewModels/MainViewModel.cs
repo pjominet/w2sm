@@ -52,10 +52,9 @@ public partial class MainViewModel : ObservableObject
     {
         _configService = new ConfigService();
         _loggingService = new LoggingService();
-        var dzipService = new DzipService();
-        _gameFileService = new GameFileService(_configService, dzipService);
+        _gameFileService = new GameFileService(_configService);
         _mergeService = new MergeService();
-        _installService = new InstallService(_configService, dzipService);
+        _installService = new InstallService(_configService);
 
         GamePath = _configService.GamePath ?? string.Empty;
         UserContentPath = _configService.UserContentPath;
@@ -85,9 +84,9 @@ public partial class MainViewModel : ObservableObject
             Title = "Select your Witcher 2 Installation Folder"
         };
 
-        if (dialog.ShowDialog() != true) 
+        if (dialog.ShowDialog() != true)
             return;
-        
+
         GamePath = dialog.FolderName;
         _configService.GamePath = GamePath;
         IsGamePathValid = _configService.IsGamePathValid();
@@ -96,7 +95,7 @@ public partial class MainViewModel : ObservableObject
         {
             Log($"Game path set: {GamePath}");
             UserContentPath = _configService.UserContentPath;
-                
+
             Task.Run(() =>
             {
                 _gameFileService.BuildVanillaIndex();
@@ -122,9 +121,9 @@ public partial class MainViewModel : ObservableObject
             Title = "Select UserContent Folder"
         };
 
-        if (dialog.ShowDialog() != true) 
+        if (dialog.ShowDialog() != true)
             return;
-        
+
         UserContentPath = dialog.FolderName;
         _configService.UserContentPath = UserContentPath;
         Log($"UserContent path set: {UserContentPath}");
@@ -153,26 +152,25 @@ public partial class MainViewModel : ObservableObject
             foreach (var file in dialog.FileNames)
             {
                 Log($"Loading: {Path.GetFileName(file)}");
-                
+
                 var archive = await Task.Run(() => ArchiveService.LoadModArchive(file));
-                
+
                 if (archive.IsLoaded)
                 {
                     LoadedMods.Add(archive);
                     _configService.AddRecentMod(file);
-                    
-                    var scriptCount = archive.Files.Count(f => f.FileType == ModFileType.Script);
-                    var dzipCount = archive.Files.Count(f => f.FileType == ModFileType.Dzip);
-                    Log($"  Loaded: {archive.Files.Count} files ({scriptCount} scripts, {dzipCount} dzip archives)");
+
+                    var dzipCount = archive.Files.Count(f => f.FileType is ModFileType.Dzip);
+                    Log($"\tFound: {dzipCount} dzip archives");
                 }
                 else
                 {
-                    Log($"  Error: {archive.Error}");
+                    Log($"\tError: {archive.Error}");
                 }
             }
 
             await DetectConflictsAsync();
-            
+
             IsBusy = false;
             StatusMessage = $"Loaded {LoadedMods.Count} mods, {Conflicts.Count} conflicts detected";
         }
@@ -181,12 +179,12 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void RemoveMod(ModArchive? mod)
     {
-        if (mod is null) 
+        if (mod is null)
             return;
-        
+
         LoadedMods.Remove(mod);
         Log($"Removed: {mod.FileName}");
-        
+
         // Re-detect conflicts
         Task.Run(async () =>
         {
@@ -206,11 +204,11 @@ public partial class MainViewModel : ObservableObject
     private async Task DetectConflictsAsync()
     {
         Conflicts.Clear();
-        
+
         if (LoadedMods.Count == 0)
             return;
 
-        var conflicts = await Task.Run(() => 
+        var conflicts = await Task.Run(() =>
             MergeService.DetectConflicts(LoadedMods.ToList(), _gameFileService));
 
         foreach (var conflict in conflicts)
@@ -238,9 +236,9 @@ public partial class MainViewModel : ObservableObject
 
         foreach (var conflict in Conflicts)
         {
-            if (conflict.Status is not ConflictStatus.Pending) 
+            if (conflict.Status is not ConflictStatus.Pending)
                 continue;
-            
+
             var success = await Task.Run(() => _mergeService.TryAutoMerge(conflict));
             if (success)
             {
@@ -302,19 +300,19 @@ public partial class MainViewModel : ObservableObject
             Owner = Application.Current.MainWindow
         };
 
-        if (mergeWindow.ShowDialog() != true || !mergeWindow.MergeAccepted) 
+        if (mergeWindow.ShowDialog() != true || !mergeWindow.MergeAccepted)
             return;
-        
+
         SelectedConflict.MergedContent = mergeWindow.MergedContent;
         SelectedConflict.Status = ConflictStatus.ManuallyMerged;
         Log($"Manually merged: {SelectedConflict.FileName}");
         StatusMessage = $"Merged: {SelectedConflict.FileName}";
-            
+
         // Refresh the conflict list to update status indicators
         var index = Conflicts.IndexOf(SelectedConflict);
-        if (index < 0) 
+        if (index < 0)
             return;
-            
+
         var conflict = SelectedConflict;
         Conflicts.RemoveAt(index);
         Conflicts.Insert(index, conflict);
@@ -354,7 +352,7 @@ public partial class MainViewModel : ObservableObject
             // Install non-conflicting files from each mod
             foreach (var mod in LoadedMods)
             {
-                await Task.Run(() => 
+                await Task.Run(() =>
                     _installService.InstallNonConflictingFiles(mod, SelectedInstallLocation, conflictPaths));
                 Log($"Installed non-conflicting files from: {mod.FileName}");
             }
@@ -363,7 +361,7 @@ public partial class MainViewModel : ObservableObject
             var mergedCount = 0;
             foreach (var conflict in Conflicts.Where(c => c.MergedContent is not null))
             {
-                await Task.Run(() => 
+                await Task.Run(() =>
                     _installService.InstallMergedScript(conflict, SelectedInstallLocation));
                 mergedCount++;
             }

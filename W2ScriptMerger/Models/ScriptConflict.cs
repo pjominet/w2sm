@@ -10,7 +10,6 @@ public class ScriptConflict
     public List<ModFileVersion> ModVersions { get; } = [];
     public ConflictStatus Status { get; set; } = ConflictStatus.Pending;
     public byte[]? MergedContent { get; set; }
-    public bool CanAutoMerge { get; set; }
 }
 
 public class ModFileVersion

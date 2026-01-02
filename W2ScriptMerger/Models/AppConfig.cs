@@ -1,5 +1,6 @@
 namespace W2ScriptMerger.Models;
 
+// ReSharper disable InconsistentNaming
 public class AppConfig
 {
     public string? GamePath { get; set; }

@@ -29,7 +29,6 @@ public static class ArchiveService
                 {
                     RelativePath = relativePath,
                     Content = ms.ToArray(),
-                    SourceArchive = archivePath,
                     FileType = GetFileType(ext)
                 };
 
@@ -47,10 +46,7 @@ public static class ArchiveService
         return modArchive;
     }
 
-    private static string NormalizePath(string path)
-    {
-        return path.Replace('\\', '/').TrimStart('/');
-    }
+    private static string NormalizePath(string path) => path.Replace('\\', '/').TrimStart('/');
 
     private static ModFileType GetFileType(string extension)
     {

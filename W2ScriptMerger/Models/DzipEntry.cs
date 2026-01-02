@@ -7,5 +7,4 @@ public class DzipEntry
     public long UncompressedSize { get; init; }
     public long Offset { get; init; }
     public long CompressedSize { get; init; }
-    public byte[]? Data { get; set; }
 }

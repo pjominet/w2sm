@@ -3,7 +3,7 @@ using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
-public class InstallService(ConfigService configService, DzipService dzipService)
+public class InstallService(ConfigService configService)
 {
     private string GetInstallPath(InstallLocation location)
     {
@@ -19,7 +19,7 @@ public class InstallService(ConfigService configService, DzipService dzipService
     {
         var basePath = GetInstallPath(location);
         var targetPath = Path.Combine(basePath, file.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-        
+
         var dir = Path.GetDirectoryName(targetPath);
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
@@ -34,7 +34,7 @@ public class InstallService(ConfigService configService, DzipService dzipService
 
         var basePath = GetInstallPath(location);
         var targetPath = Path.Combine(basePath, conflict.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-        
+
         var dir = Path.GetDirectoryName(targetPath);
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
@@ -53,7 +53,7 @@ public class InstallService(ConfigService configService, DzipService dzipService
                 continue;
 
             var targetPath = Path.Combine(basePath, file.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-            
+
             var dir = Path.GetDirectoryName(targetPath);
             if (!string.IsNullOrEmpty(dir))
                 Directory.CreateDirectory(dir);
@@ -66,7 +66,7 @@ public class InstallService(ConfigService configService, DzipService dzipService
     {
         var basePath = GetInstallPath(location);
         var sourcePath = Path.Combine(basePath, relativePath.Replace('/', Path.DirectorySeparatorChar));
-        
+
         if (!File.Exists(sourcePath))
             return;
 
@@ -86,7 +86,7 @@ public class InstallService(ConfigService configService, DzipService dzipService
         var basePath = GetInstallPath(location);
         var backupDir = Path.Combine(basePath, ".w2merger_backup");
         var backupPath = Path.Combine(backupDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
-        
+
         if (!File.Exists(backupPath))
             return;
 

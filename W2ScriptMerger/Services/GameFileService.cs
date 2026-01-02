@@ -3,7 +3,7 @@ using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
-public class GameFileService(ConfigService configService, DzipService dzipService)
+public class GameFileService(ConfigService configService)
 {
     private Dictionary<string, string>? _vanillaScriptIndex;
 
@@ -26,7 +26,7 @@ public class GameFileService(ConfigService configService, DzipService dzipServic
                 {
                     if (!entry.Name.EndsWith(".ws", StringComparison.OrdinalIgnoreCase))
                         continue;
-                    
+
                     var key = NormalizeScriptPath(entry.Name);
                     _vanillaScriptIndex.TryAdd(key, dzipFile);
                 }
@@ -65,14 +65,14 @@ public class GameFileService(ConfigService configService, DzipService dzipServic
         if (!_vanillaScriptIndex!.TryGetValue(key, out var sourcePath))
             return null;
 
-        if (!sourcePath.EndsWith(".dzip", StringComparison.OrdinalIgnoreCase)) 
+        if (!sourcePath.EndsWith(".dzip", StringComparison.OrdinalIgnoreCase))
             return File.ReadAllBytes(sourcePath);
-        
+
         // Extract from dzip
         var entries = DzipService.UnpackDzip(sourcePath);
-        var entry = entries.FirstOrDefault(e => 
+        var entry = entries.FirstOrDefault(e =>
             NormalizeScriptPath(e.Name).Equals(key, StringComparison.OrdinalIgnoreCase));
-            
+
         return entry is not null ? DzipService.ExtractEntry(sourcePath, entry) : null;
     }
 
@@ -90,9 +90,9 @@ public class GameFileService(ConfigService configService, DzipService dzipServic
 
         // Check UserContent
         var userContentPath = configService.UserContentPath;
-        if (!Directory.Exists(userContentPath)) 
+        if (!Directory.Exists(userContentPath))
             return mods;
-        
+
         mods.AddRange(Directory.GetDirectories(userContentPath));
         mods.AddRange(Directory.GetFiles(userContentPath, "*.dzip"));
 

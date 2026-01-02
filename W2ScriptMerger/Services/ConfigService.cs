@@ -4,6 +4,7 @@ using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
+// ReSharper disable InconsistentNaming
 public class ConfigService
 {
     private readonly string _configPath;
@@ -32,7 +33,7 @@ public class ConfigService
         {
             if (!string.IsNullOrEmpty(Config.UserContentPath))
                 return Config.UserContentPath;
-            
+
             var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             return Path.Combine(docs, "Witcher 2", "UserContent");
         }
@@ -72,7 +73,7 @@ public class ConfigService
 
         var witcher2Exe = Path.Combine(Config.GamePath, "bin", "witcher2.exe");
         var cookedPC = Path.Combine(Config.GamePath, "CookedPC");
-        
+
         return File.Exists(witcher2Exe) || Directory.Exists(cookedPC);
     }
 
