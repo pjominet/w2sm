@@ -9,5 +9,4 @@ public class ModArchive
     public List<ModFile> Files { get; set; } = [];
     public bool IsLoaded { get; set; }
     public string? Error { get; set; }
-    public InstallLocation TargetLocation { get; set; } = InstallLocation.UserContent;
 }
