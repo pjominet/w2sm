@@ -1,5 +1,4 @@
 using System.IO;
-using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
@@ -7,7 +6,7 @@ public class GameFileService(ConfigService configService)
 {
     private Dictionary<string, string>? _vanillaScriptIndex;
 
-    public void BuildVanillaIndex()
+    public void BuildGameScriptIndex()
     {
         _vanillaScriptIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -50,7 +49,7 @@ public class GameFileService(ConfigService configService)
     public bool HasVanillaScript(string relativePath)
     {
         if (_vanillaScriptIndex is null)
-            BuildVanillaIndex();
+            BuildGameScriptIndex();
 
         var key = NormalizeScriptPath(relativePath);
         return _vanillaScriptIndex!.ContainsKey(key);
@@ -59,7 +58,7 @@ public class GameFileService(ConfigService configService)
     public byte[]? GetVanillaScriptContent(string relativePath)
     {
         if (_vanillaScriptIndex is null)
-            BuildVanillaIndex();
+            BuildGameScriptIndex();
 
         var key = NormalizeScriptPath(relativePath);
         if (!_vanillaScriptIndex!.TryGetValue(key, out var sourcePath))
@@ -79,24 +78,9 @@ public class GameFileService(ConfigService configService)
     public HashSet<string> GetAllVanillaScriptPaths()
     {
         if (_vanillaScriptIndex is null)
-            BuildVanillaIndex();
+            BuildGameScriptIndex();
 
         return new HashSet<string>(_vanillaScriptIndex!.Keys, StringComparer.OrdinalIgnoreCase);
-    }
-
-    public List<string> GetInstalledMods()
-    {
-        var mods = new List<string>();
-
-        // Check UserContent
-        var userContentPath = configService.UserContentPath;
-        if (!Directory.Exists(userContentPath))
-            return mods;
-
-        mods.AddRange(Directory.GetDirectories(userContentPath));
-        mods.AddRange(Directory.GetFiles(userContentPath, "*.dzip"));
-
-        return mods;
     }
 
     private static string NormalizeScriptPath(string path) => path.Replace('\\', '/').ToLowerInvariant().TrimStart('/');

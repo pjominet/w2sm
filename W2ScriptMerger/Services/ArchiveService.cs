@@ -1,12 +1,13 @@
 using System.IO;
-using SharpCompress.Archives;
+using SharpCompress.Archives.Zip;
+using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
-public static class ArchiveService
+public class ArchiveService(ConfigService configService)
 {
-    public static ModArchive LoadModArchive(string archivePath)
+    public async Task<ModArchive> LoadModArchive(string archivePath, CancellationToken? ctx = null)
     {
         var modArchive = new ModArchive
         {
@@ -15,24 +16,54 @@ public static class ArchiveService
 
         try
         {
-            using var archive = ArchiveFactory.Open(archivePath);
-            foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
+            // create mod folder in staging directory
+            var outputDir = Path.Combine(configService.ModStagingPath, modArchive.ModName);
+            Directory.CreateDirectory(outputDir);
+
+            using (var archive = ZipArchive.Open(archivePath))
             {
-                var relativePath = NormalizePath(entry.Key ?? string.Empty);
-                var ext = Path.GetExtension(relativePath).ToLowerInvariant();
-
-                using var stream = entry.OpenEntryStream();
-                using var ms = new MemoryStream();
-                stream.CopyTo(ms);
-
-                var modFile = new ModFile
+                foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
                 {
-                    RelativePath = relativePath,
-                    Content = ms.ToArray(),
-                    FileType = GetFileType(ext)
-                };
+                    var normalizedPath = entry.Key.NormalizePath();
 
-                modArchive.Files.Add(modFile);
+                    // ignore empty entries
+                    if (!normalizedPath.HasValue())
+                        continue;
+
+                    // ignore txt files, as they are not relevant to the mod (readme, manual install instructions, changelog, etc.)
+                    if (normalizedPath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    // only include files from CookedPC
+                    string relativePath;
+                    if (normalizedPath.StartsWith("CookedPc/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!normalizedPath.StartsWith("CookedPc/", StringComparison.OrdinalIgnoreCase))
+                            continue;
+                        relativePath = normalizedPath["CookedPc/".Length..];
+                    }
+                    else relativePath = Path.Combine("CookedPC", normalizedPath); // assume if there is no CookedPc/ prefix it should be under CookedPc/ and include it
+
+                    await using var entryStream = await entry.OpenEntryStreamAsync(ctx ?? CancellationToken.None);
+                    using var ms = new MemoryStream();
+                    await entryStream.CopyToAsync(ms);
+                    ms.Position = 0;
+
+                    // Extract to file
+                    var extractedFilePath = Path.Combine(outputDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
+                    Directory.CreateDirectory(Path.GetDirectoryName(extractedFilePath)!);
+                    await using (var fileStream = File.Create(extractedFilePath))
+                    {
+                        await ms.CopyToAsync(fileStream);
+                    }
+
+                    // Create ModFile reference
+                    modArchive.Files.Add(new ModFile
+                    {
+                        RelativePath = relativePath,
+                        Content = ms.ToArray()
+                    });
+                }
             }
 
             modArchive.IsLoaded = true;
@@ -44,19 +75,5 @@ public static class ArchiveService
         }
 
         return modArchive;
-    }
-
-    private static string NormalizePath(string path) => path.Replace('\\', '/').TrimStart('/');
-
-    private static ModFileType GetFileType(string extension)
-    {
-        return extension switch
-        {
-            ".ws" => ModFileType.Script,
-            ".dzip" => ModFileType.Dzip,
-            ".xml" => ModFileType.Xml,
-            ".w2strings" => ModFileType.Strings,
-            _ => ModFileType.Other
-        };
     }
 }

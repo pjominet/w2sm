@@ -1,23 +1,23 @@
 using System.Text;
 using DiffPlex;
-using DiffPlex.DiffBuilder;
+using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
-public class MergeService
+public class MergeService(GameFileService gameFileService)
 {
     private readonly Differ _differ = new();
 
-    public static List<ScriptConflict> DetectConflicts(List<ModArchive> archives, GameFileService gameFileService)
+    public List<ScriptConflict> DetectConflicts(List<ModArchive> archives)
     {
         var conflicts = new Dictionary<string, ScriptConflict>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var archive in archives)
         {
-            foreach (var file in archive.Files.Where(f => f.FileType == ModFileType.Script))
+            foreach (var file in archive.Files)
             {
-                var key = NormalizePath(file.RelativePath);
+                var key = file.RelativePath.NormalizePath();
 
                 if (!conflicts.TryGetValue(key, out var conflict))
                 {
@@ -31,7 +31,7 @@ public class MergeService
 
                 conflict.ModVersions.Add(new ModFileVersion
                 {
-                    SourceArchive = archive.FileName,
+                    SourceArchive = archive.ModName,
                     Content = file.Content
                 });
 
@@ -89,70 +89,72 @@ public class MergeService
 
     private MergeResult ThreeWayMerge(string baseText, string leftText, string rightText)
     {
+        // Split texts into lines for line-based merging
         var baseLines = baseText.Split('\n');
         var leftLines = leftText.Split('\n');
         var rightLines = rightText.Split('\n');
 
+        // Create diffs between base and each mod version
         var leftDiff = _differ.CreateLineDiffs(baseText, leftText, ignoreWhitespace: false);
         var rightDiff = _differ.CreateLineDiffs(baseText, rightText, ignoreWhitespace: false);
 
-        var leftChanges = GetChangedLineNumbers(leftDiff);
-        var rightChanges = GetChangedLineNumbers(rightDiff);
+        // Get changed line numbers to check for conflicts
+        var leftChanged = GetChangedLineNumbers(leftDiff);
+        var rightChanged = GetChangedLineNumbers(rightDiff);
 
-        // Check for overlapping changes
-        var hasConflicts = leftChanges.Intersect(rightChanges).Any();
-
+        // If any line is changed by both mods, it's a conflict
+        var hasConflicts = leftChanged.Intersect(rightChanged).Any();
         if (hasConflicts)
-            return new MergeResult
-            {
-                HasConflicts = true,
-                MergedText = string.Empty
-            };
+            return new MergeResult { HasConflicts = true, MergedText = string.Empty };
 
-        // Apply non-conflicting changes
-        var result = new List<string>();
-        var leftBuilder = InlineDiffBuilder.Diff(baseText, leftText);
-        var rightBuilder = InlineDiffBuilder.Diff(baseText, rightText);
+        // No conflicts, so merge the changes
+        // Collect all operations (deletions and insertions) from both diffs
+        var operations = new List<(int Position, int Count, bool IsDeletion, object Lines)>();
 
-        // Simple merge: prefer left changes, then right changes, then base
-        var leftLineIndex = 0;
-        var rightLineIndex = 0;
-        var baseLineIndex = 0;
-
-        while (baseLineIndex < baseLines.Length || leftLineIndex < leftLines.Length || rightLineIndex < rightLines.Length)
+        foreach (var block in leftDiff.DiffBlocks)
         {
-            var leftHasChange = leftChanges.Contains(baseLineIndex);
-            var rightHasChange = rightChanges.Contains(baseLineIndex);
+            if (block.DeleteCountA > 0)
+                operations.Add((block.DeleteStartA, block.DeleteCountA, true, null)!);
+            if (block.InsertCountB <= 0)
+                continue;
 
-            if (leftHasChange && !rightHasChange)
-            {
-                // Use left version
-                if (leftLineIndex < leftLines.Length)
-                    result.Add(leftLines[leftLineIndex]);
-            }
-            else if (rightHasChange && !leftHasChange)
-            {
-                // Use right version
-                if (rightLineIndex < rightLines.Length)
-                    result.Add(rightLines[rightLineIndex]);
-            }
-            else
-            {
-                // No change or both same, use base/left
-                if (baseLineIndex < baseLines.Length)
-                    result.Add(baseLines[baseLineIndex]);
-            }
-
-            leftLineIndex++;
-            rightLineIndex++;
-            baseLineIndex++;
+            var lines = leftLines.Skip(block.InsertStartB).Take(block.InsertCountB).ToList();
+            operations.Add((block.DeleteStartA, 0, false, lines));
         }
 
-        return new MergeResult
+        foreach (var block in rightDiff.DiffBlocks)
         {
-            HasConflicts = false,
-            MergedText = string.Join('\n', result)
-        };
+            if (block.DeleteCountA > 0)
+                operations.Add((block.DeleteStartA, block.DeleteCountA, true, null)!);
+            if (block.InsertCountB <= 0)
+                continue;
+
+            var lines = rightLines.Skip(block.InsertStartB).Take(block.InsertCountB).ToList();
+            operations.Add((block.DeleteStartA, 0, false, lines));
+        }
+
+        // Sort operations by position descending to apply from end to beginning, avoiding index shifts
+        operations = operations.OrderByDescending(o => o.Position).ToList();
+
+        // Start with base lines
+        var mergedLines = baseLines.ToList();
+
+        // Apply each operation
+        foreach (var op in operations)
+        {
+            if (op.IsDeletion)
+            {
+                mergedLines.RemoveRange(op.Position, op.Count);
+            }
+            else if (op.Lines is List<string> lines)
+            {
+                mergedLines.InsertRange(op.Position, lines);
+            }
+        }
+
+        // Join the merged lines back into text
+        var mergedText = string.Join('\n', mergedLines);
+        return new MergeResult { HasConflicts = false, MergedText = mergedText };
     }
 
     private static HashSet<int> GetChangedLineNumbers(DiffPlex.Model.DiffResult diff)
@@ -162,15 +164,15 @@ public class MergeService
         foreach (var block in diff.DiffBlocks)
         {
             for (var i = block.DeleteStartA; i < block.DeleteStartA + block.DeleteCountA; i++)
-            {
                 changed.Add(i);
-            }
+
+            // Include insertion positions as changed lines to detect conflicts when both mods insert at the same location
+            if (block.InsertCountB > 0)
+                changed.Add(block.DeleteStartA);
         }
 
         return changed;
     }
-
-    private static string NormalizePath(string path) => path.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
 }
 
 public class MergeResult

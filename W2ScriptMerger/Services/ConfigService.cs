@@ -8,12 +8,14 @@ namespace W2ScriptMerger.Services;
 public class ConfigService
 {
     private readonly string _configPath;
+    private readonly string _modStagingPath;
     private AppConfig Config { get; }
 
     public ConfigService()
     {
         var exeLocation = AppDomain.CurrentDomain.BaseDirectory;
         _configPath = Path.Combine(exeLocation, "config.json");
+        _modStagingPath = Path.Combine(exeLocation, "modStaging");
         Config = Load();
     }
 
@@ -23,6 +25,16 @@ public class ConfigService
         set
         {
             Config.GamePath = value;
+            Save();
+        }
+    }
+
+    public string ModStagingPath
+    {
+        get => _modStagingPath;
+        set
+        {
+            Config.ModStagingPath = value;
             Save();
         }
     }
@@ -74,16 +86,7 @@ public class ConfigService
         var witcher2Exe = Path.Combine(Config.GamePath, "bin", "witcher2.exe");
         var cookedPC = Path.Combine(Config.GamePath, "CookedPC");
 
-        return File.Exists(witcher2Exe) || Directory.Exists(cookedPC);
-    }
-
-    public void AddRecentMod(string path)
-    {
-        Config.RecentMods.Remove(path);
-        Config.RecentMods.Insert(0, path);
-        if (Config.RecentMods.Count > 10)
-            Config.RecentMods = Config.RecentMods.Take(10).ToList();
-        Save();
+        return File.Exists(witcher2Exe) && Directory.Exists(cookedPC);
     }
 
     private AppConfig Load()

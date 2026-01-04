@@ -5,19 +5,19 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:W2ScriptMerger.ViewModels"
         mc:Ignorable="d"
-        Title="Witcher 2 Mod/Script Manager" 
+        Title="Witcher 2 Mod/Script Manager"
         Height="750" Width="1100"
         MinHeight="600" MinWidth="900"
         WindowStartupLocation="CenterScreen"
         Background="#1E1E1E">
-    
+
     <Window.DataContext>
         <vm:MainViewModel/>
     </Window.DataContext>
-    
+
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        
+
         <Style x:Key="DarkButton" TargetType="Button">
             <Setter Property="Background" Value="#3C3C3C"/>
             <Setter Property="Foreground" Value="#FFFFFF"/>
@@ -28,7 +28,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
+                        <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="3"
@@ -51,7 +51,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        
+
         <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource DarkButton}">
             <Setter Property="Background" Value="#0078D4"/>
             <Setter Property="BorderBrush" Value="#0078D4"/>
@@ -64,7 +64,7 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        
+
         <Style x:Key="DarkTextBox" TargetType="TextBox">
             <Setter Property="Background" Value="#2D2D2D"/>
             <Setter Property="Foreground" Value="#FFFFFF"/>
@@ -73,14 +73,14 @@
             <Setter Property="Padding" Value="6,4"/>
             <Setter Property="CaretBrush" Value="#FFFFFF"/>
         </Style>
-        
+
         <Style x:Key="DarkListBox" TargetType="ListBox">
             <Setter Property="Background" Value="#252526"/>
             <Setter Property="Foreground" Value="#FFFFFF"/>
             <Setter Property="BorderBrush" Value="#3C3C3C"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
-        
+
         <Style x:Key="DarkListBoxItem" TargetType="ListBoxItem">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#CCCCCC"/>
@@ -88,7 +88,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border Background="{TemplateBinding Background}" 
+                        <Border Background="{TemplateBinding Background}"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter/>
                         </Border>
@@ -106,14 +106,14 @@
             </Setter>
         </Style>
     </Window.Resources>
-    
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
+
         <!-- Header / Configuration -->
         <Border Grid.Row="0" Background="#252526" Padding="15">
             <Grid>
@@ -126,14 +126,19 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <!-- Game Path -->
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Game Path:" Foreground="#CCCCCC" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GamePath, Mode=TwoWay}" Style="{StaticResource DarkTextBox}" Margin="0,0,10,0"/>
                 <Button Grid.Row="1" Grid.Column="2" Content="Browse..." Command="{Binding BrowseGamePathCommand}" Style="{StaticResource DarkButton}"/>
+
+                <!-- Mod Staging Path -->
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Mod Staging Path:" Foreground="#CCCCCC" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GamePath, Mode=TwoWay}" Style="{StaticResource DarkTextBox}" Margin="0,0,10,0"/>
+                <Button Grid.Row="1" Grid.Column="2" Content="Browse..." Command="{Binding BrowseGamePathCommand}" Style="{StaticResource DarkButton}"/>
             </Grid>
         </Border>
-        
+
         <!-- Main Content -->
         <Grid Grid.Row="1" Margin="15">
             <Grid.ColumnDefinitions>
@@ -141,7 +146,7 @@
                 <ColumnDefinition Width="10"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            
+
             <!-- Left Panel - Mods and Actions -->
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
@@ -150,7 +155,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                
+
                 <!-- Loaded Mods Header -->
                 <StackPanel Grid.Row="0" Margin="0,0,0,10">
                     <TextBlock Text="Loaded Mods" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,8"/>
@@ -159,9 +164,9 @@
                         <Button Content="Clear All" Command="{Binding ClearModsCommand}" Style="{StaticResource DarkButton}"/>
                     </StackPanel>
                 </StackPanel>
-                
+
                 <!-- Mods List -->
-                <ListBox Grid.Row="1" ItemsSource="{Binding LoadedMods}" Style="{StaticResource DarkListBox}" 
+                <ListBox Grid.Row="1" ItemsSource="{Binding LoadedMods}" Style="{StaticResource DarkListBox}"
                          ItemContainerStyle="{StaticResource DarkListBoxItem}">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
@@ -171,20 +176,20 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="{Binding FileName}" FontWeight="Medium"/>
+                                    <TextBlock Text="{Binding ModName}" FontWeight="Medium"/>
                                     <TextBlock Text="{Binding Files.Count, StringFormat='{}{0} files'}" FontSize="11" Foreground="#888888"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="✕" Command="{Binding DataContext.RemoveModCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                <Button Grid.Column="1" Content="✕" Command="{Binding DataContext.RemoveModCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}" Style="{StaticResource DarkButton}" Padding="6,2" FontSize="10"/>
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
-                
+
                 <!-- Install Location -->
-                <GroupBox Grid.Row="2" Header="Install Location" Foreground="#CCCCCC" BorderBrush="#3C3C3C" Margin="0,10,0,0" Padding="8">
+                <GroupBox Grid.Row="2" Header="Mod Install Location" Foreground="#CCCCCC" BorderBrush="#3C3C3C" Margin="0,10,0,0" Padding="8">
                     <StackPanel>
-                        <TextBlock Text="Choose where merged scripts should be installed:" Foreground="#AAAAAA" Margin="0,0,0,6"/>
+                        <TextBlock Text="Choose where mod should be installed:" Foreground="#AAAAAA" Margin="0,0,0,6"/>
                         <ComboBox ItemsSource="{Binding InstallLocations}"
                                   SelectedItem="{Binding SelectedInstallLocation}"
                                   Foreground="#FFFFFF"
@@ -200,14 +205,14 @@
                         </ComboBox>
                     </StackPanel>
                 </GroupBox>
-                
+
                 <!-- Action Buttons -->
                 <StackPanel Grid.Row="3" Margin="0,15,0,0">
-                    <Button Content="🔄 Auto-Merge All" Command="{Binding AutoMergeAllCommand}" Style="{StaticResource AccentButton}" Margin="0,0,0,8"/>
-                    <Button Content="📦 Install Merged Files" Command="{Binding InstallMergedFilesCommand}" Style="{StaticResource AccentButton}"/>
+                    <Button Content="🔄 Attempt Merge All" Command="{Binding AutoMergeAllCommand}" Style="{StaticResource AccentButton}" Margin="0,0,0,8"/>
+                    <Button Content="📦 Install Mods" Command="{Binding InstallMergedFilesCommand}" Style="{StaticResource AccentButton}"/>
                 </StackPanel>
             </Grid>
-            
+
             <!-- Right Panel - Conflicts and Diff View -->
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
@@ -218,12 +223,12 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="150"/>
                 </Grid.RowDefinitions>
-                
+
                 <!-- Conflicts Header -->
                 <TextBlock Grid.Row="0" Text="Script Conflicts" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,8"/>
-                
+
                 <!-- Conflicts List -->
-                <ListBox Grid.Row="1" ItemsSource="{Binding Conflicts}" SelectedItem="{Binding SelectedConflict}" 
+                <ListBox Grid.Row="1" ItemsSource="{Binding Conflicts}" SelectedItem="{Binding SelectedConflict}"
                          Style="{StaticResource DarkListBox}" ItemContainerStyle="{StaticResource DarkListBoxItem}">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
@@ -233,7 +238,7 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                
+
                                 <Ellipse Grid.Column="0" Width="10" Height="10" Margin="0,0,8,0">
                                     <Ellipse.Style>
                                         <Style TargetType="Ellipse">
@@ -252,39 +257,39 @@
                                         </Style>
                                     </Ellipse.Style>
                                 </Ellipse>
-                                
+
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Text="{Binding FileName}" FontWeight="Medium"/>
                                     <TextBlock Text="{Binding RelativePath}" FontSize="10" Foreground="#888888" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
-                                
-                                <TextBlock Grid.Column="2" Text="{Binding ModVersions.Count, StringFormat='{}{0} mods'}" 
+
+                                <TextBlock Grid.Column="2" Text="{Binding ModVersions.Count, StringFormat='{}{0} mods'}"
                                            FontSize="11" Foreground="#888888" VerticalAlignment="Center"/>
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
-                
+
                 <!-- Diff Actions -->
                 <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10">
                     <Button Content="✏ Open Merge Editor" Command="{Binding OpenMergeEditorCommand}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
                     <Button Content="👁 View Diff" Command="{Binding ViewConflictDiffCommand}" Style="{StaticResource DarkButton}"/>
                 </StackPanel>
-                
+
                 <!-- Diff View -->
-                <TextBox Grid.Row="3" Text="{Binding DiffViewText, Mode=OneWay}" 
+                <TextBox Grid.Row="3" Text="{Binding DiffViewText, Mode=OneWay}"
                          Style="{StaticResource DarkTextBox}"
-                         IsReadOnly="True" 
-                         FontFamily="Consolas" 
+                         IsReadOnly="True"
+                         FontFamily="Consolas"
                          FontSize="11"
                          VerticalScrollBarVisibility="Auto"
                          HorizontalScrollBarVisibility="Auto"
                          TextWrapping="NoWrap"
                          AcceptsReturn="True"/>
-                
+
                 <!-- Log Header -->
                 <TextBlock Grid.Row="4" Text="Log" FontSize="12" Foreground="#888888" Margin="0,10,0,5"/>
-                
+
                 <!-- Log Messages -->
                 <ListBox Grid.Row="5" ItemsSource="{Binding LogMessages}" Style="{StaticResource DarkListBox}"
                          ItemContainerStyle="{StaticResource DarkListBoxItem}" FontFamily="Consolas" FontSize="11">
@@ -296,7 +301,7 @@
                 </ListBox>
             </Grid>
         </Grid>
-        
+
         <!-- Status Bar -->
         <Border Grid.Row="2" Background="#007ACC" Padding="10,5">
             <Grid>

@@ -5,8 +5,10 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Services;
+using W2ScriptMerger.Tools;
 using W2ScriptMerger.Views;
 
 namespace W2ScriptMerger.ViewModels;
@@ -14,34 +16,29 @@ namespace W2ScriptMerger.ViewModels;
 public partial class MainViewModel : ObservableObject
 {
     private readonly ConfigService _configService;
+    private readonly ArchiveService _archiveService;
     private readonly GameFileService _gameFileService;
     private readonly MergeService _mergeService;
     private readonly InstallService _installService;
     private readonly LoggingService _loggingService;
 
-    [ObservableProperty]
-    private string _gamePath = string.Empty;
+    [ObservableProperty] private string _gamePath = string.Empty;
 
-    [ObservableProperty]
-    private string _userContentPath = string.Empty;
+    [ObservableProperty] private string _modStagingPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "modStaging");
 
-    [ObservableProperty]
-    private bool _isGamePathValid;
+    [ObservableProperty] private string _userContentPath = string.Empty;
 
-    [ObservableProperty]
-    private string _statusMessage = "Ready";
+    [ObservableProperty] private bool _isGamePathValid;
 
-    [ObservableProperty]
-    private bool _isBusy;
+    [ObservableProperty] private string _statusMessage = "Ready";
 
-    [ObservableProperty]
-    private InstallLocation _selectedInstallLocation = InstallLocation.UserContent;
+    [ObservableProperty] private bool _isBusy;
 
-    [ObservableProperty]
-    private ScriptConflict? _selectedConflict;
+    [ObservableProperty] private InstallLocation _selectedInstallLocation = InstallLocation.UserContent;
 
-    [ObservableProperty]
-    private string _diffViewText = string.Empty;
+    [ObservableProperty] private ScriptConflict? _selectedConflict;
+
+    [ObservableProperty] private string _diffViewText = string.Empty;
 
     public ObservableCollection<ModArchive> LoadedMods { get; } = [];
     public ObservableCollection<ScriptConflict> Conflicts { get; } = [];
@@ -52,11 +49,13 @@ public partial class MainViewModel : ObservableObject
     {
         _configService = new ConfigService();
         _loggingService = new LoggingService();
+        _archiveService = new ArchiveService(_configService);
         _gameFileService = new GameFileService(_configService);
-        _mergeService = new MergeService();
         _installService = new InstallService(_configService);
+        _mergeService = new MergeService(_gameFileService);
 
         GamePath = _configService.GamePath ?? string.Empty;
+        ModStagingPath = _configService.ModStagingPath;
         UserContentPath = _configService.UserContentPath;
         IsGamePathValid = _configService.IsGamePathValid();
         SelectedInstallLocation = _configService.DefaultInstallLocation;
@@ -67,7 +66,7 @@ public partial class MainViewModel : ObservableObject
         Log("Game path validated. Building vanilla script index...");
         Task.Run(() =>
         {
-            _gameFileService.BuildVanillaIndex();
+            _gameFileService.BuildGameScriptIndex();
             Application.Current.Dispatcher.Invoke(() =>
             {
                 Log($"Indexed {_gameFileService.GetAllVanillaScriptPaths().Count} vanilla scripts");
@@ -98,7 +97,7 @@ public partial class MainViewModel : ObservableObject
 
             Task.Run(() =>
             {
-                _gameFileService.BuildVanillaIndex();
+                _gameFileService.BuildGameScriptIndex();
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     Log($"Indexed {_gameFileService.GetAllVanillaScriptPaths().Count} vanilla scripts");
@@ -111,6 +110,22 @@ public partial class MainViewModel : ObservableObject
             Log("Warning: Selected path does not appear to be a valid Witcher 2 installation");
             StatusMessage = "Invalid game path";
         }
+    }
+
+    [RelayCommand]
+    private void BrowseModStagingPath()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select your Witcher 2 Mod Staging Folder"
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        ModStagingPath = dialog.FolderName;
+        _configService.ModStagingPath = ModStagingPath;
+        Log($"Mod staging path set: {UserContentPath}");
     }
 
     [RelayCommand]
@@ -145,28 +160,22 @@ public partial class MainViewModel : ObservableObject
             IsBusy = true;
             StatusMessage = "Loading mods...";
 
-            var dir = Path.GetDirectoryName(dialog.FileNames.FirstOrDefault());
-            if (!string.IsNullOrEmpty(dir))
-                _configService.LastModDirectory = dir;
+            var targetDirectory = Path.GetDirectoryName(dialog.FileNames.FirstOrDefault());
+            if (targetDirectory.HasValue())
+                _configService.LastModDirectory = targetDirectory;
 
             foreach (var file in dialog.FileNames)
             {
                 Log($"Loading: {Path.GetFileName(file)}");
 
-                var archive = await Task.Run(() => ArchiveService.LoadModArchive(file));
+                var archive = await Task.Run(() => _archiveService.LoadModArchive(file));
 
                 if (archive.IsLoaded)
                 {
                     LoadedMods.Add(archive);
-                    _configService.AddRecentMod(file);
-
-                    var dzipCount = archive.Files.Count(f => f.FileType is ModFileType.Dzip);
-                    Log($"\tFound: {dzipCount} dzip archives");
+                    Log($"Mod {archive.ModName} staged");
                 }
-                else
-                {
-                    Log($"\tError: {archive.Error}");
-                }
+                else Log($"Error: {archive.Error}");
             }
 
             await DetectConflictsAsync();
@@ -181,24 +190,36 @@ public partial class MainViewModel : ObservableObject
     {
         if (mod is null)
             return;
-
-        LoadedMods.Remove(mod);
-        Log($"Removed: {mod.FileName}");
-
-        // Re-detect conflicts
-        Task.Run(async () =>
+        try
         {
-            await Application.Current.Dispatcher.InvokeAsync(async () => await DetectConflictsAsync());
-        });
+            Directory.Delete(Path.Combine(_configService.ModStagingPath, mod.ModName));
+            LoadedMods.Remove(mod);
+            Log($"Removed: {mod.ModName}");
+
+            // Re-detect conflicts
+            Task.Run(async () => { await Application.Current.Dispatcher.InvokeAsync(async () => await DetectConflictsAsync()); });
+        }
+        catch (Exception ex)
+        {
+            Log($"Error removing mod: {ex.Message}");
+        }
     }
 
     [RelayCommand]
     private void ClearMods()
     {
-        LoadedMods.Clear();
-        Conflicts.Clear();
-        Log("Cleared all mods");
-        StatusMessage = "Ready";
+        try
+        {
+            DirectoryUtils.ClearDirectory(_configService.ModStagingPath);
+            LoadedMods.Clear();
+            Conflicts.Clear();
+            Log("Purged all mods");
+            StatusMessage = "Ready";
+        }
+        catch (Exception ex)
+        {
+            Log($"Error purging mods: {ex.Message}");
+        }
     }
 
     private async Task DetectConflictsAsync()
@@ -208,13 +229,10 @@ public partial class MainViewModel : ObservableObject
         if (LoadedMods.Count == 0)
             return;
 
-        var conflicts = await Task.Run(() =>
-            MergeService.DetectConflicts(LoadedMods.ToList(), _gameFileService));
+        var conflicts = await Task.Run(() => _mergeService.DetectConflicts(LoadedMods.ToList()));
 
         foreach (var conflict in conflicts)
-        {
             Conflicts.Add(conflict);
-        }
 
         Log($"Detected {Conflicts.Count} potential conflicts");
     }
@@ -354,7 +372,7 @@ public partial class MainViewModel : ObservableObject
             {
                 await Task.Run(() =>
                     _installService.InstallNonConflictingFiles(mod, SelectedInstallLocation, conflictPaths));
-                Log($"Installed non-conflicting files from: {mod.FileName}");
+                Log($"Installed non-conflicting files from: {mod.ModName}");
             }
 
             // Install merged files

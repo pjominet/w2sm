@@ -2,6 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using W2ScriptMerger.Models;
+using W2ScriptMerger.Tools;
 
 namespace W2ScriptMerger.Services;
 
@@ -34,7 +35,7 @@ public static class DzipService
         using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true);
 
         var magic = reader.ReadUInt32();
-        if (magic != DzipMagic)
+        if (magic is not DzipMagic)
             throw new InvalidDataException($"Invalid DZIP magic: expected 0x{DzipMagic:X8}, got 0x{magic:X8}");
 
         var version = reader.ReadUInt32();
@@ -47,7 +48,7 @@ public static class DzipService
         // part of the DZIP header (an 8-byte checksum recorded after writing the entry table), but CDPR’s tools never validate it when reading.
         // Witcher 2’s runtime ignores it too: only the header fields (count, offsets, etc.) are required to load a dzip. Because the hash is effectively informational/legacy,
         // the current reader just advances past it and does not use it anywhere else.
-        _ = reader.ReadUInt64();
+       _ = reader.ReadUInt64();
 
         var entries = new List<DzipEntry>();
         stream.Seek(entryTableOffset, SeekOrigin.Begin);
@@ -82,7 +83,7 @@ public static class DzipService
     }
 
     /// <summary>
-    /// Reads the raw bytes of an entry, inflating zlib-compressed payloads when needed.
+    /// Reads the raw bytes of an entry, inflating LZF-compressed payloads when needed.
     /// </summary>
     private static byte[] ExtractEntry(Stream? stream, DzipEntry entry)
     {
@@ -94,16 +95,12 @@ public static class DzipService
         if (entry.CompressedSize == entry.UncompressedSize)
             return compressedData;
 
-        // Data is zlib compressed
-        using var compressedStream = new MemoryStream(compressedData);
-        // Skip zlib header (2 bytes)
-        compressedStream.ReadByte();
-        compressedStream.ReadByte();
-
-        using var deflateStream = new DeflateStream(compressedStream, CompressionMode.Decompress);
-        using var resultStream = new MemoryStream();
-        deflateStream.CopyTo(resultStream);
-        return resultStream.ToArray();
+        // Data is LZF compressed
+        var uncompressed = new byte[entry.UncompressedSize];
+        var read = Lzf.Decompress(compressedData, uncompressed);
+        return read != entry.UncompressedSize
+            ? throw new InvalidOperationException($"Decompression failed: expected {entry.UncompressedSize} bytes, got {read}")
+            : uncompressed;
     }
 
     /// <summary>
@@ -148,33 +145,7 @@ public static class DzipService
             var fileInfo = new FileInfo(file);
 
             var offset = stream.Position;
-            byte[] dataToWrite;
-            long compressedSize;
-
-            // Compress with zlib
-            using (var compressedStream = new MemoryStream())
-            {
-                // Write zlib header
-                compressedStream.WriteByte(0x78);
-                compressedStream.WriteByte(0x9C);
-
-                using (var deflateStream = new DeflateStream(compressedStream, CompressionLevel.Optimal, leaveOpen: true))
-                {
-                    deflateStream.Write(fileData, 0, fileData.Length);
-                }
-
-                dataToWrite = compressedStream.ToArray();
-                compressedSize = dataToWrite.Length;
-            }
-
-            // If compression didn't help, store uncompressed
-            if (compressedSize >= fileData.Length)
-            {
-                dataToWrite = fileData;
-                compressedSize = fileData.Length;
-            }
-
-            stream.Write(dataToWrite, 0, dataToWrite.Length);
+            long compressedSize = Lzf.Compress(fileData, fileData.Length, new byte[fileData.Length], fileData.Length);
 
             entries.Add(new DzipEntry
             {
