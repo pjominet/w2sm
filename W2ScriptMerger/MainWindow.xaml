@@ -15,98 +15,6 @@
         <vm:MainViewModel/>
     </Window.DataContext>
 
-    <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-
-        <Style x:Key="DarkButton" TargetType="Button">
-            <Setter Property="Background" Value="#3C3C3C"/>
-            <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#555555"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="3"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#505050"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#606060"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#2D2D2D"/>
-                                <Setter Property="Foreground" Value="#666666"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource DarkButton}">
-            <Setter Property="Background" Value="#0078D4"/>
-            <Setter Property="BorderBrush" Value="#0078D4"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#1084D8"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#006CBD"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="DarkTextBox" TargetType="TextBox">
-            <Setter Property="Background" Value="#2D2D2D"/>
-            <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#555555"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="CaretBrush" Value="#FFFFFF"/>
-        </Style>
-
-        <Style x:Key="DarkListBox" TargetType="ListBox">
-            <Setter Property="Background" Value="#252526"/>
-            <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#3C3C3C"/>
-            <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-
-        <Style x:Key="DarkListBoxItem" TargetType="ListBoxItem">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#CCCCCC"/>
-            <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border Background="{TemplateBinding Background}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#3C3C3C"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#094771"/>
-                                <Setter Property="Foreground" Value="#FFFFFF"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -118,6 +26,7 @@
         <Border Grid.Row="0" Background="#252526" Padding="15">
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
@@ -133,9 +42,9 @@
                 <Button Grid.Row="1" Grid.Column="2" Content="Browse..." Command="{Binding BrowseGamePathCommand}" Style="{StaticResource DarkButton}"/>
 
                 <!-- Mod Staging Path -->
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Mod Staging Path:" Foreground="#CCCCCC" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GamePath, Mode=TwoWay}" Style="{StaticResource DarkTextBox}" Margin="0,0,10,0"/>
-                <Button Grid.Row="1" Grid.Column="2" Content="Browse..." Command="{Binding BrowseGamePathCommand}" Style="{StaticResource DarkButton}"/>
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Mod Staging Path:" Foreground="#CCCCCC" VerticalAlignment="Center" Margin="0,10,10,0"/>
+                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ModStagingPath, Mode=TwoWay}" Style="{StaticResource DarkTextBox}" Margin="0,10,10,0"/>
+                <Button Grid.Row="2" Grid.Column="2" Content="Browse..." Command="{Binding BrowseModStagingPathCommand}" Style="{StaticResource DarkButton}" Margin="0,10,0,0"/>
             </Grid>
         </Border>
 
@@ -186,30 +95,9 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
-                <!-- Install Location -->
-                <GroupBox Grid.Row="2" Header="Mod Install Location" Foreground="#CCCCCC" BorderBrush="#3C3C3C" Margin="0,10,0,0" Padding="8">
-                    <StackPanel>
-                        <TextBlock Text="Choose where mod should be installed:" Foreground="#AAAAAA" Margin="0,0,0,6"/>
-                        <ComboBox ItemsSource="{Binding InstallLocations}"
-                                  SelectedItem="{Binding SelectedInstallLocation}"
-                                  Foreground="#FFFFFF"
-                                  Background="#2A2A2A"
-                                  BorderBrush="#555555"
-                                  Padding="4"
-                                  Height="28">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </StackPanel>
-                </GroupBox>
-
                 <!-- Action Buttons -->
-                <StackPanel Grid.Row="3" Margin="0,15,0,0">
-                    <Button Content="🔄 Attempt Merge All" Command="{Binding AutoMergeAllCommand}" Style="{StaticResource AccentButton}" Margin="0,0,0,8"/>
-                    <Button Content="📦 Install Mods" Command="{Binding InstallMergedFilesCommand}" Style="{StaticResource AccentButton}"/>
+                <StackPanel Grid.Row="2" Margin="0,15,0,0">
+                    <Button Content="📦 Deploy Mods" Command="{Binding InstallMergedFilesCommand}" Style="{StaticResource AccentButton}"/>
                 </StackPanel>
             </Grid>
 
@@ -272,6 +160,7 @@
 
                 <!-- Diff Actions -->
                 <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10">
+                    <Button Content="🔄 Auto Merge" Command="{Binding AutoMergeAllCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,8,0"/>
                     <Button Content="✏ Open Merge Editor" Command="{Binding OpenMergeEditorCommand}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
                     <Button Content="👁 View Diff" Command="{Binding ViewConflictDiffCommand}" Style="{StaticResource DarkButton}"/>
                 </StackPanel>
@@ -291,22 +180,22 @@
                 <TextBlock Grid.Row="4" Text="Log" FontSize="12" Foreground="#888888" Margin="0,10,0,5"/>
 
                 <!-- Log Messages -->
-                <ListBox Grid.Row="5" ItemsSource="{Binding LogMessages}" Style="{StaticResource DarkListBox}"
-                         ItemContainerStyle="{StaticResource DarkListBoxItem}" FontFamily="Consolas" FontSize="11">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding}" Foreground="#AAAAAA"/>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                <TextBox Grid.Row="5" Text="{Binding LogText, Mode=OneWay}"
+                         Style="{StaticResource DarkTextBox}"
+                         IsReadOnly="True"
+                         FontFamily="Consolas"
+                         FontSize="11"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"/>
             </Grid>
         </Grid>
 
         <!-- Status Bar -->
-        <Border Grid.Row="2" Background="#007ACC" Padding="10,5">
+        <Border Grid.Row="2" Background="#007ACC" Padding="5,5">
             <Grid>
                 <TextBlock Text="{Binding StatusMessage}" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                <ProgressBar IsIndeterminate="True" Width="100" Height="3" HorizontalAlignment="Right"
+                <ProgressBar IsIndeterminate="True" Width="250" Height="15" HorizontalAlignment="Right"
                              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
             </Grid>
         </Border>

@@ -1,87 +1,48 @@
 using System.IO;
+using W2ScriptMerger.Extensions;
+using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
 public class GameFileService(ConfigService configService)
 {
-    private Dictionary<string, string>? _vanillaScriptIndex;
+    private Dictionary<string, ScriptReference>? _vanillaScriptIndex;
 
     public void BuildGameScriptIndex()
     {
-        _vanillaScriptIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _vanillaScriptIndex = new Dictionary<string, ScriptReference>(StringComparer.OrdinalIgnoreCase);
 
-        var cookedPcPath = configService.CookedPCPath;
+        var cookedPcPath = configService.GameCookedPCPath;
         if (string.IsNullOrEmpty(cookedPcPath) || !Directory.Exists(cookedPcPath))
             return;
 
         // Index .dzip files in CookedPC
-        var dzipFiles = Directory.GetFiles(cookedPcPath, "*.dzip", SearchOption.AllDirectories);
-        foreach (var dzipFile in dzipFiles)
+        var scriptFiles = Directory.GetFiles(cookedPcPath, "*.dzip", SearchOption.AllDirectories);
+        foreach (var scriptFile in scriptFiles)
         {
-            try
+            _vanillaScriptIndex.Add(scriptFile, new ScriptReference
             {
-                var entries = DzipService.UnpackDzip(dzipFile);
-                foreach (var entry in entries)
-                {
-                    if (!entry.Name.EndsWith(".ws", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var key = NormalizeScriptPath(entry.Name);
-                    _vanillaScriptIndex.TryAdd(key, dzipFile);
-                }
-            }
-            catch
-            {
-                // Skip invalid dzip files
-            }
-        }
-
-        // Index loose .ws files
-        var wsFiles = Directory.GetFiles(cookedPcPath, "*.ws", SearchOption.AllDirectories);
-        foreach (var wsFile in wsFiles)
-        {
-            var relativePath = Path.GetRelativePath(cookedPcPath, wsFile);
-            var key = NormalizeScriptPath(relativePath);
-            _vanillaScriptIndex.TryAdd(key, wsFile);
+                SourcePath = Path.Combine(cookedPcPath, Path.GetFileName(scriptFile))
+            });
         }
     }
 
-    public bool HasVanillaScript(string relativePath)
-    {
-        if (_vanillaScriptIndex is null)
-            BuildGameScriptIndex();
-
-        var key = NormalizeScriptPath(relativePath);
-        return _vanillaScriptIndex!.ContainsKey(key);
-    }
+    public int GetScriptIndexCount() => _vanillaScriptIndex?.Count ?? 0;
 
     public byte[]? GetVanillaScriptContent(string relativePath)
     {
         if (_vanillaScriptIndex is null)
             BuildGameScriptIndex();
 
-        var key = NormalizeScriptPath(relativePath);
-        if (!_vanillaScriptIndex!.TryGetValue(key, out var sourcePath))
+        var key = relativePath.NormalizePath();
+        if (!_vanillaScriptIndex!.TryGetValue(key, out var scriptReference))
             return null;
 
-        if (!sourcePath.EndsWith(".dzip", StringComparison.OrdinalIgnoreCase))
-            return File.ReadAllBytes(sourcePath);
-
         // Extract from dzip
-        var entries = DzipService.UnpackDzip(sourcePath);
+        var entries = DzipService.UnpackDzip(scriptReference.SourcePath);
         var entry = entries.FirstOrDefault(e =>
-            NormalizeScriptPath(e.Name).Equals(key, StringComparison.OrdinalIgnoreCase));
+            e.Name.NormalizePath().Equals(key, StringComparison.OrdinalIgnoreCase));
 
-        return entry is not null ? DzipService.ExtractEntry(sourcePath, entry) : null;
+        return entry is not null ? DzipService.ExtractEntry(scriptReference.SourcePath, entry) : null;
     }
-
-    public HashSet<string> GetAllVanillaScriptPaths()
-    {
-        if (_vanillaScriptIndex is null)
-            BuildGameScriptIndex();
-
-        return new HashSet<string>(_vanillaScriptIndex!.Keys, StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static string NormalizeScriptPath(string path) => path.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
 }

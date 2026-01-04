@@ -1,5 +1,5 @@
 using System.IO;
-using Newtonsoft.Json;
+using System.Text.Json;
 using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
@@ -9,10 +9,12 @@ public class ConfigService
 {
     private readonly string _configPath;
     private readonly string _modStagingPath;
+    private readonly JsonSerializerOptions _jsonSerializerOptions;
     private AppConfig Config { get; }
 
-    public ConfigService()
+    public ConfigService(JsonSerializerOptions options)
     {
+        _jsonSerializerOptions = options;
         var exeLocation = AppDomain.CurrentDomain.BaseDirectory;
         _configPath = Path.Combine(exeLocation, "config.json");
         _modStagingPath = Path.Combine(exeLocation, "modStaging");
@@ -56,7 +58,7 @@ public class ConfigService
         }
     }
 
-    public string? CookedPCPath => string.IsNullOrEmpty(Config.GamePath) ? null : Path.Combine(Config.GamePath, "CookedPC");
+    public string? GameCookedPCPath => string.IsNullOrEmpty(Config.GamePath) ? null : Path.Combine(Config.GamePath, "CookedPC");
 
     public InstallLocation DefaultInstallLocation
     {
@@ -96,7 +98,7 @@ public class ConfigService
             if (File.Exists(_configPath))
             {
                 var json = File.ReadAllText(_configPath);
-                return JsonConvert.DeserializeObject<AppConfig>(json) ?? new AppConfig();
+                return JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
             }
         }
         catch
@@ -110,7 +112,7 @@ public class ConfigService
     {
         try
         {
-            var json = JsonConvert.SerializeObject(Config, Formatting.Indented);
+            var json = JsonSerializer.Serialize(Config, _jsonSerializerOptions);
             File.WriteAllText(_configPath, json);
         }
         catch

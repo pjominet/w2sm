@@ -4,71 +4,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Merge Editor" 
+        Title="Merge Editor"
         Height="700" Width="1200"
         MinHeight="500" MinWidth="800"
         WindowStartupLocation="CenterOwner"
         Background="#1E1E1E">
-    
-    <Window.Resources>
-        <Style x:Key="DarkButton" TargetType="Button">
-            <Setter Property="Background" Value="#3C3C3C"/>
-            <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#555555"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="3"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#505050"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#606060"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#2D2D2D"/>
-                                <Setter Property="Foreground" Value="#666666"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        
-        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource DarkButton}">
-            <Setter Property="Background" Value="#0078D4"/>
-            <Setter Property="BorderBrush" Value="#0078D4"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#1084D8"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#006CBD"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        
-        <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource DarkButton}">
-            <Setter Property="Background" Value="#107C10"/>
-            <Setter Property="BorderBrush" Value="#107C10"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#148814"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-    </Window.Resources>
-    
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -77,7 +18,7 @@
             <RowDefinition Height="200"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
+
         <!-- Header -->
         <Border Grid.Row="0" Background="#252526" Padding="15,10">
             <Grid>
@@ -95,7 +36,7 @@
                 </StackPanel>
             </Grid>
         </Border>
-        
+
         <!-- Diff Panels -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
@@ -103,7 +44,7 @@
                 <ColumnDefinition Width="5"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            
+
             <!-- Left Panel (Vanilla/Base) -->
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
@@ -113,20 +54,20 @@
                 <Border Grid.Row="0" Background="#2D2D30" Padding="10,5">
                     <TextBlock x:Name="LeftPanelTitle" Text="Vanilla Version" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                 </Border>
-                <RichTextBox x:Name="LeftDiffView" Grid.Row="1" 
+                <RichTextBox x:Name="LeftDiffView" Grid.Row="1"
                              Background="#1E1E1E" Foreground="#D4D4D4"
                              FontFamily="Consolas" FontSize="12"
-                             IsReadOnly="True" 
+                             IsReadOnly="True"
                              VerticalScrollBarVisibility="Auto"
                              HorizontalScrollBarVisibility="Auto"
                              BorderThickness="0"
                              Padding="5"
                              ScrollViewer.ScrollChanged="SyncScroll_Left"/>
             </Grid>
-            
+
             <!-- Splitter -->
             <GridSplitter Grid.Column="1" Width="5" Background="#3C3C3C" HorizontalAlignment="Stretch"/>
-            
+
             <!-- Right Panel (Mod) -->
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
@@ -141,10 +82,10 @@
                                   SelectionChanged="ModVersionSelector_Changed"/>
                     </StackPanel>
                 </Border>
-                <RichTextBox x:Name="RightDiffView" Grid.Row="1" 
+                <RichTextBox x:Name="RightDiffView" Grid.Row="1"
                              Background="#1E1E1E" Foreground="#D4D4D4"
                              FontFamily="Consolas" FontSize="12"
-                             IsReadOnly="True" 
+                             IsReadOnly="True"
                              VerticalScrollBarVisibility="Auto"
                              HorizontalScrollBarVisibility="Auto"
                              BorderThickness="0"
@@ -152,7 +93,7 @@
                              ScrollViewer.ScrollChanged="SyncScroll_Right"/>
             </Grid>
         </Grid>
-        
+
         <!-- Merge Result Header -->
         <Border Grid.Row="2" Background="#2D2D30" Padding="10,5">
             <Grid>
@@ -167,7 +108,7 @@
                 </StackPanel>
             </Grid>
         </Border>
-        
+
         <!-- Merge Result Editor -->
         <TextBox x:Name="MergeResultEditor" Grid.Row="3"
                  Background="#1E1E1E" Foreground="#D4D4D4"
@@ -179,7 +120,7 @@
                  BorderThickness="0"
                  Padding="5"
                  CaretBrush="#FFFFFF"/>
-        
+
         <!-- Footer -->
         <Border Grid.Row="4" Background="#252526" Padding="15,10">
             <Grid>
@@ -187,11 +128,11 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                     <TextBlock x:Name="StatusText" Text="Ready" Foreground="#888888" VerticalAlignment="Center"/>
                 </StackPanel>
-                
+
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button Content="Cancel" Style="{StaticResource DarkButton}" Margin="0,0,10,0" Click="Cancel_Click"/>
                     <Button Content="Save Merge" Style="{StaticResource SuccessButton}" Click="SaveMerge_Click"/>

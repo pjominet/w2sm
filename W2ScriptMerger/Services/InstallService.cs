@@ -10,7 +10,7 @@ public class InstallService(ConfigService configService)
         return location switch
         {
             InstallLocation.UserContent => configService.UserContentPath,
-            InstallLocation.CookedPC => configService.CookedPCPath ?? throw new InvalidOperationException("Game path not set"),
+            InstallLocation.CookedPC => configService.GameCookedPCPath ?? throw new InvalidOperationException("Game path not set"),
             _ => throw new ArgumentOutOfRangeException(nameof(location))
         };
     }

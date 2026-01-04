@@ -12,6 +12,7 @@ public class AppConfig
 
 public enum InstallLocation
 {
-    UserContent,
-    CookedPC
+    Unknown = 0,
+    CookedPC = 1,
+    UserContent = 2
 }

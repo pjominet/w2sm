@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -22,6 +23,12 @@ public partial class MainViewModel : ObservableObject
     private readonly InstallService _installService;
     private readonly LoggingService _loggingService;
 
+    private static string ModsListPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "loadedMods.json");
+    private readonly JsonSerializerOptions _jsonSerializerOptions = new()
+    {
+        WriteIndented = true
+    };
+
     [ObservableProperty] private string _gamePath = string.Empty;
 
     [ObservableProperty] private string _modStagingPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "modStaging");
@@ -40,14 +47,15 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private string _diffViewText = string.Empty;
 
+    [ObservableProperty] private string _logText = string.Empty;
+
     public ObservableCollection<ModArchive> LoadedMods { get; } = [];
     public ObservableCollection<ScriptConflict> Conflicts { get; } = [];
-    public ObservableCollection<string> LogMessages { get; } = [];
-    public InstallLocation[] InstallLocations { get; } = Enum.GetValues<InstallLocation>();
+    private ObservableCollection<string> LogMessages { get; } = [];
 
     public MainViewModel()
     {
-        _configService = new ConfigService();
+        _configService = new ConfigService(_jsonSerializerOptions);
         _loggingService = new LoggingService();
         _archiveService = new ArchiveService(_configService);
         _gameFileService = new GameFileService(_configService);
@@ -60,23 +68,93 @@ public partial class MainViewModel : ObservableObject
         IsGamePathValid = _configService.IsGamePathValid();
         SelectedInstallLocation = _configService.DefaultInstallLocation;
 
+        LogMessages.CollectionChanged += (_, _) => UpdateLogText();
+
         if (!IsGamePathValid)
             return;
 
         Log("Game path validated. Building vanilla script index...");
-        Task.Run(() =>
+        Task.Run(async () =>
+        {
+            await BuildVanillaScriptIndex();
+            await DetectStagedMods();
+        });
+    }
+
+    #region Private Helpers
+
+    partial void OnSelectedInstallLocationChanged(InstallLocation value) => _configService.DefaultInstallLocation = value;
+
+    private void UpdateLogText() => LogText = string.Join(Environment.NewLine, LogMessages);
+
+    private void UpdateLoadedModsList()
+    {
+        var json = JsonSerializer.Serialize(LoadedMods.ToList(), _jsonSerializerOptions);
+        File.WriteAllText(ModsListPath, json);
+    }
+
+    private void Log(string message)
+    {
+        var timestamp = DateTime.Now.ToString("HH:mm:ss");
+        var formatted = $"[{timestamp}] {message}";
+        LogMessages.Add(formatted);
+        _loggingService.Log(message);
+    }
+
+    private async Task BuildVanillaScriptIndex()
+    {
+        await Task.Run(async () =>
         {
             _gameFileService.BuildGameScriptIndex();
-            Application.Current.Dispatcher.Invoke(() =>
+            await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                Log($"Indexed {_gameFileService.GetAllVanillaScriptPaths().Count} vanilla scripts");
-                StatusMessage = "Ready - Vanilla scripts indexed";
+                Log($"Indexed {_gameFileService.GetScriptIndexCount()} vanilla script archives");
+                StatusMessage = "Ready - Vanilla script archives indexed";
             });
         });
     }
 
+    private async Task DetectStagedMods()
+    {
+        Log("Detecting staged mods...");
+        if (!File.Exists(ModsListPath))
+            return;
+
+        var json = await File.ReadAllTextAsync(ModsListPath);
+        var mods = JsonSerializer.Deserialize<List<ModArchive>>(json);
+        if (mods is not null)
+        {
+            Log($"Detected {mods.Count} staged mods");
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                LoadedMods.Clear();
+                foreach (var mod in mods)
+                    LoadedMods.Add(mod);
+            });
+        }
+
+        await DetectConflictsAsync();
+    }
+
+    private async Task DetectConflictsAsync()
+    {
+        Conflicts.Clear();
+
+        if (LoadedMods.Count == 0)
+            return;
+
+        var conflicts = await Task.Run(() => _mergeService.DetectConflicts(LoadedMods.ToList()));
+
+        foreach (var conflict in conflicts)
+            Conflicts.Add(conflict);
+
+        Log($"Detected {Conflicts.Count} potential conflicts");
+    }
+
+    #endregion
+
     [RelayCommand]
-    private void BrowseGamePath()
+    private async Task BrowseGamePath()
     {
         var dialog = new OpenFolderDialog
         {
@@ -94,16 +172,7 @@ public partial class MainViewModel : ObservableObject
         {
             Log($"Game path set: {GamePath}");
             UserContentPath = _configService.UserContentPath;
-
-            Task.Run(() =>
-            {
-                _gameFileService.BuildGameScriptIndex();
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    Log($"Indexed {_gameFileService.GetAllVanillaScriptPaths().Count} vanilla scripts");
-                    StatusMessage = "Ready - Vanilla scripts indexed";
-                });
-            });
+            await BuildVanillaScriptIndex();
         }
         else
         {
@@ -175,9 +244,10 @@ public partial class MainViewModel : ObservableObject
                     LoadedMods.Add(archive);
                     Log($"Mod {archive.ModName} staged");
                 }
-                else Log($"Error: {archive.Error}");
+                else Log(archive.Error ?? "Failed to add mod: Unknown error");
             }
 
+            UpdateLoadedModsList();
             await DetectConflictsAsync();
 
             IsBusy = false;
@@ -192,8 +262,12 @@ public partial class MainViewModel : ObservableObject
             return;
         try
         {
-            Directory.Delete(Path.Combine(_configService.ModStagingPath, mod.ModName));
+            // Remove mod directory and all its contents
+            var modPath = Path.Combine(_configService.ModStagingPath, mod.ModName);
+            DirectoryUtils.ClearDirectory(modPath);
+            Directory.Delete(modPath);
             LoadedMods.Remove(mod);
+            UpdateLoadedModsList();
             Log($"Removed: {mod.ModName}");
 
             // Re-detect conflicts
@@ -213,6 +287,7 @@ public partial class MainViewModel : ObservableObject
             DirectoryUtils.ClearDirectory(_configService.ModStagingPath);
             LoadedMods.Clear();
             Conflicts.Clear();
+            UpdateLoadedModsList();
             Log("Purged all mods");
             StatusMessage = "Ready";
         }
@@ -220,21 +295,6 @@ public partial class MainViewModel : ObservableObject
         {
             Log($"Error purging mods: {ex.Message}");
         }
-    }
-
-    private async Task DetectConflictsAsync()
-    {
-        Conflicts.Clear();
-
-        if (LoadedMods.Count == 0)
-            return;
-
-        var conflicts = await Task.Run(() => _mergeService.DetectConflicts(LoadedMods.ToList()));
-
-        foreach (var conflict in conflicts)
-            Conflicts.Add(conflict);
-
-        Log($"Detected {Conflicts.Count} potential conflicts");
     }
 
     [RelayCommand]
@@ -370,8 +430,27 @@ public partial class MainViewModel : ObservableObject
             // Install non-conflicting files from each mod
             foreach (var mod in LoadedMods)
             {
+                var installLocation = mod.ModInstallLocation;
+                if (installLocation == InstallLocation.Unknown)
+                {
+                    var dialog = new InstallLocationDialog(mod.ModName)
+                    {
+                        Owner = Application.Current.MainWindow
+                    };
+
+                    if (dialog.ShowDialog() == true)
+                    {
+                        installLocation = dialog.SelectedLocation;
+                    }
+                    else
+                    {
+                        Log($"Skipped installing: {mod.ModName}");
+                        continue;
+                    }
+                }
+
                 await Task.Run(() =>
-                    _installService.InstallNonConflictingFiles(mod, SelectedInstallLocation, conflictPaths));
+                    _installService.InstallNonConflictingFiles(mod, installLocation, conflictPaths));
                 Log($"Installed non-conflicting files from: {mod.ModName}");
             }
 
@@ -396,15 +475,5 @@ public partial class MainViewModel : ObservableObject
         {
             IsBusy = false;
         }
-    }
-
-    partial void OnSelectedInstallLocationChanged(InstallLocation value) => _configService.DefaultInstallLocation = value;
-
-    private void Log(string message)
-    {
-        var timestamp = DateTime.Now.ToString("HH:mm:ss");
-        var formatted = $"[{timestamp}] {message}";
-        LogMessages.Add(formatted);
-        _loggingService.Log(message);
     }
 }

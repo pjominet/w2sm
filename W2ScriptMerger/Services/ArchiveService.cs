@@ -1,5 +1,5 @@
 using System.IO;
-using SharpCompress.Archives.Zip;
+using SharpCompress.Archives;
 using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 
@@ -20,7 +20,7 @@ public class ArchiveService(ConfigService configService)
             var outputDir = Path.Combine(configService.ModStagingPath, modArchive.ModName);
             Directory.CreateDirectory(outputDir);
 
-            using (var archive = ZipArchive.Open(archivePath))
+            using (var archive = ArchiveFactory.Open(archivePath))
             {
                 foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
                 {
@@ -34,15 +34,22 @@ public class ArchiveService(ConfigService configService)
                     if (normalizedPath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    // only include files from CookedPC
                     string relativePath;
                     if (normalizedPath.StartsWith("CookedPc/", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (!normalizedPath.StartsWith("CookedPc/", StringComparison.OrdinalIgnoreCase))
-                            continue;
+                        modArchive.ModInstallLocation = InstallLocation.CookedPC;
                         relativePath = normalizedPath["CookedPc/".Length..];
                     }
-                    else relativePath = Path.Combine("CookedPC", normalizedPath); // assume if there is no CookedPc/ prefix it should be under CookedPc/ and include it
+                    else if (normalizedPath.StartsWith("UserContent/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        modArchive.ModInstallLocation = InstallLocation.UserContent;
+                        relativePath = normalizedPath["UserContent/".Length..];
+                    }
+                    else
+                    {
+                        modArchive.ModInstallLocation = InstallLocation.Unknown;
+                        relativePath = normalizedPath;
+                    }
 
                     await using var entryStream = await entry.OpenEntryStreamAsync(ctx ?? CancellationToken.None);
                     using var ms = new MemoryStream();
@@ -70,7 +77,7 @@ public class ArchiveService(ConfigService configService)
         }
         catch (Exception ex)
         {
-            modArchive.Error = ex.Message;
+            modArchive.Error = $"Extracting archive failed: {ex.Message}";
             modArchive.IsLoaded = false;
         }
 

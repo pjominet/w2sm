@@ -1,10 +1,12 @@
 using System.IO;
+using System.Text.Json.Serialization;
 
 namespace W2ScriptMerger.Models;
 
 public class ModFile
 {
     public string RelativePath { get; init; } = string.Empty;
+    [JsonIgnore]
     public byte[] Content { get; init; } = [];
 
     public ModFileType FileType => GetFileType(Path.GetExtension(RelativePath));
@@ -23,8 +25,8 @@ public class ModFile
 
 public enum ModFileType
 {
-    Dzip,        // .dzip archives
-    Xml,         // .xml files
-    Strings,     // .w2strings localization
-    Other        // Other files
+    Dzip = 1,        // .dzip archives
+    Xml = 2,         // .xml files
+    Strings = 3,     // .w2strings localization
+    Other = 4        // Other files
 }
