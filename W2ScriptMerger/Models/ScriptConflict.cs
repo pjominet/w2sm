@@ -4,25 +4,16 @@ namespace W2ScriptMerger.Models;
 
 public class ScriptConflict
 {
-    public string RelativePath { get; init; } = string.Empty;
-    public string FileName => Path.GetFileName(RelativePath);
-    public byte[]? VanillaContent { get; init; }
-    public List<ModFileVersion> ModVersions { get; } = [];
-    public ConflictStatus Status { get; set; } = ConflictStatus.Pending;
-    public byte[]? MergedContent { get; set; }
-}
-
-public class ModFileVersion
-{
-    public string SourceArchive { get; init; } = string.Empty;
-    public byte[] Content { get; init; } = [];
+    public required string OriginalFilePath { get; init; } = string.Empty;
+    public string OriginalFileName => Path.GetFileName(OriginalFilePath);
+    public List<string> ConflictingFilePaths { get; } = [];
+    public ConflictStatus Status { get; set; } = ConflictStatus.Unresolved;
 }
 
 public enum ConflictStatus
 {
-    Pending,
-    AutoMerged,
-    ManuallyMerged,
-    Failed,
+    Unresolved,
+    AutoResolved,
+    ManuallyResolved,
     Skipped
 }

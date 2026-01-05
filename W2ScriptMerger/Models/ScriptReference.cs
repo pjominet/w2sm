@@ -2,8 +2,10 @@
 
 public class ScriptReference
 {
-    public required string SourcePath { get; init; }
-    public string? OverridenBy { get; set; } = null;
+    public SortedDictionary<int, string> OverrideHistory { get; set; } = [];
 
-    public bool IsVanilla => OverridenBy is not null;
+    public bool IsVanilla => OverrideHistory.Count == 1;
+    public string GetCurrentScriptPath() => OverrideHistory.Last().Value;
+    public string GetVanillaScriptPath() => OverrideHistory.First().Value;
+    public string GetScriptPath(int version) => OverrideHistory[version];
 }

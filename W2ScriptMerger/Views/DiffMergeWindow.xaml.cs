@@ -25,7 +25,7 @@ public partial class DiffMergeWindow
         InitializeComponent();
         _conflict = conflict;
 
-        FileNameText.Text = conflict.FileName;
+        /*FileNameText.Text = conflict.FileName;
         FilePathText.Text = conflict.RelativePath;
 
         // Populate mod version selector
@@ -54,12 +54,12 @@ public partial class DiffMergeWindow
         }
 
         LoadDiffView();
-        UpdateStatus();
+        UpdateStatus();*/
     }
 
     private void LoadDiffView()
     {
-        var vanillaText = _conflict.VanillaContent is not null
+        /*var vanillaText = _conflict.VanillaContent is not null
             ? Encoding.UTF8.GetString(_conflict.VanillaContent)
             : string.Empty;
 
@@ -74,7 +74,7 @@ public partial class DiffMergeWindow
         DisplayDiffInRichTextBox(LeftDiffView, vanillaText, modText, isLeft: true);
 
         // Right panel - mod with diff highlighting
-        DisplayDiffInRichTextBox(RightDiffView, vanillaText, modText, isLeft: false);
+        DisplayDiffInRichTextBox(RightDiffView, vanillaText, modText, isLeft: false);*/
     }
 
     private void DisplayDiffInRichTextBox(RichTextBox rtb, string leftText, string rightText, bool isLeft)
@@ -178,20 +178,20 @@ public partial class DiffMergeWindow
 
     private void UseVanilla_Click(object sender, RoutedEventArgs e)
     {
-        if (_conflict.VanillaContent is null)
+        /*if (_conflict.VanillaContent is null)
             return;
 
         MergeResultEditor.Text = Encoding.UTF8.GetString(_conflict.VanillaContent);
-        UpdateStatus();
+        UpdateStatus();*/
     }
 
     private void UseMod_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedModIndex < 0 || _selectedModIndex >= _conflict.ModVersions.Count)
+        /*if (_selectedModIndex < 0 || _selectedModIndex >= _conflict.ModVersions.Count)
             return;
 
         MergeResultEditor.Text = Encoding.UTF8.GetString(_conflict.ModVersions[_selectedModIndex].Content);
-        UpdateStatus();
+        UpdateStatus();*/
     }
 
     private void CopyFromVanilla_Click(object sender, RoutedEventArgs e) => UseVanilla_Click(sender, e);
@@ -215,7 +215,7 @@ public partial class DiffMergeWindow
 
     private void UpdateStatus()
     {
-        var vanillaLines = _conflict.VanillaContent is not null
+        /*var vanillaLines = _conflict.VanillaContent is not null
             ? Encoding.UTF8.GetString(_conflict.VanillaContent).Split('\n').Length
             : 0;
 
@@ -225,6 +225,6 @@ public partial class DiffMergeWindow
 
         var mergeLines = MergeResultEditor.Text.Split('\n').Length;
 
-        StatusText.Text = $"Vanilla: {vanillaLines} lines | Mod: {modLines} lines | Merge result: {mergeLines} lines";
+        StatusText.Text = $"Vanilla: {vanillaLines} lines | Mod: {modLines} lines | Merge result: {mergeLines} lines";*/
     }
 }

@@ -27,7 +27,7 @@ public class InstallService(ConfigService configService)
         File.WriteAllBytes(targetPath, file.Content);
     }
 
-    public void InstallMergedScript(ScriptConflict conflict, InstallLocation location)
+    /*public void InstallMergedScript(ScriptConflict conflict, InstallLocation location)
     {
         if (conflict.MergedContent is null)
             throw new InvalidOperationException("No merged content available");
@@ -117,5 +117,5 @@ public class InstallService(ConfigService configService)
         {
             try { Directory.Delete(tempDir, recursive: true); } catch { }
         }
-    }
+    }*/
 }

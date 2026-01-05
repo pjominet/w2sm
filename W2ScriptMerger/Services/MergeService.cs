@@ -1,67 +1,39 @@
+using System.IO;
 using System.Text;
 using DiffPlex;
-using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
-public class MergeService(GameFileService gameFileService)
+public class MergeService(ScriptFileService scriptFileService)
 {
     private readonly Differ _differ = new();
 
-    public List<ScriptConflict> DetectConflicts(List<ModArchive> archives)
+    public List<ScriptConflict> DetectConflicts(List<ModArchive> newModArchives)
     {
         var conflicts = new Dictionary<string, ScriptConflict>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var archive in archives)
+        foreach (var modArchive in newModArchives)
         {
-            foreach (var file in archive.Files)
+            foreach (var file in modArchive.Files)
             {
-                var key = file.RelativePath.NormalizePath();
+                if (!scriptFileService.ScriptExistsIndex(file.Name))
+                    continue;
 
-                if (!conflicts.TryGetValue(key, out var conflict))
+                var conflict = new ScriptConflict
                 {
-                    conflict = new ScriptConflict
-                    {
-                        RelativePath = file.RelativePath,
-                        VanillaContent = gameFileService.GetVanillaScriptContent(file.RelativePath)
-                    };
-                    conflicts[key] = conflict;
-                }
-
-                conflict.ModVersions.Add(new ModFileVersion
-                {
-                    SourceArchive = archive.ModName,
-                    Content = file.Content
-                });
-
-                // Mark as requiring merge if multiple mods touch this file
-                if (conflict.ModVersions.Count > 1 || conflict.VanillaContent is not null)
-                {
-                }
+                    OriginalFilePath = scriptFileService.GetScriptReference(file.Name).GetCurrentScriptPath()
+                };
+                conflict.ConflictingFilePaths.Add(Path.Combine(modArchive.FilePath, file.RelativePath));
+                conflicts[file.Name] = conflict;
             }
         }
 
-        // Only return conflicts where multiple mods modify the same file
-        // or where a mod modifies a vanilla file
-        return conflicts.Values
-            .Where(c => c.ModVersions.Count > 1 || c.VanillaContent is not null)
-            .ToList();
+        return conflicts.Values.ToList();
     }
 
-    public bool TryAutoMerge(ScriptConflict conflict)
+    /*public bool TryAutoMerge(ScriptConflict conflict)
     {
-        switch (conflict.ModVersions.Count)
-        {
-            case 0:
-                return false;
-            // If only one mod and no vanilla, just use that mod's version
-            case 1 when conflict.VanillaContent is null:
-                conflict.MergedContent = conflict.ModVersions[0].Content;
-                conflict.Status = ConflictStatus.AutoMerged;
-                return true;
-        }
-
         var baseContent = conflict.VanillaContent ?? [];
         var baseText = Encoding.UTF8.GetString(baseContent);
 
@@ -75,7 +47,7 @@ public class MergeService(GameFileService gameFileService)
             var mergeResult = ThreeWayMerge(baseText, currentMerged, modText);
             if (mergeResult.HasConflicts)
             {
-                conflict.Status = ConflictStatus.Pending;
+                conflict.Status = ConflictStatus.Unresolved;
                 return false;
             }
 
@@ -85,7 +57,7 @@ public class MergeService(GameFileService gameFileService)
         conflict.MergedContent = Encoding.UTF8.GetBytes(currentMerged);
         conflict.Status = ConflictStatus.AutoMerged;
         return true;
-    }
+    }*/
 
     private MergeResult ThreeWayMerge(string baseText, string leftText, string rightText)
     {

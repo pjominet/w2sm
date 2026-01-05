@@ -18,7 +18,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly ConfigService _configService;
     private readonly ArchiveService _archiveService;
-    private readonly GameFileService _gameFileService;
+    private readonly ScriptFileService _scriptFileService;
     private readonly MergeService _mergeService;
     private readonly InstallService _installService;
     private readonly LoggingService _loggingService;
@@ -55,12 +55,12 @@ public partial class MainViewModel : ObservableObject
 
     public MainViewModel()
     {
-        _configService = new ConfigService(_jsonSerializerOptions);
         _loggingService = new LoggingService();
+        _configService = new ConfigService(_jsonSerializerOptions);
+        _scriptFileService = new ScriptFileService(_configService);
         _archiveService = new ArchiveService(_configService);
-        _gameFileService = new GameFileService(_configService);
         _installService = new InstallService(_configService);
-        _mergeService = new MergeService(_gameFileService);
+        _mergeService = new MergeService(_scriptFileService);
 
         GamePath = _configService.GamePath ?? string.Empty;
         ModStagingPath = _configService.ModStagingPath;
@@ -76,7 +76,7 @@ public partial class MainViewModel : ObservableObject
         Log("Game path validated. Building vanilla script index...");
         Task.Run(async () =>
         {
-            await BuildVanillaScriptIndex();
+            await BuildGameScriptIndex();
             await DetectStagedMods();
         });
     }
@@ -87,10 +87,10 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateLogText() => LogText = string.Join(Environment.NewLine, LogMessages);
 
-    private void UpdateLoadedModsList()
+    private async Task UpdateLoadedModsList()
     {
         var json = JsonSerializer.Serialize(LoadedMods.ToList(), _jsonSerializerOptions);
-        File.WriteAllText(ModsListPath, json);
+        await File.WriteAllTextAsync(ModsListPath, json);
     }
 
     private void Log(string message)
@@ -101,14 +101,14 @@ public partial class MainViewModel : ObservableObject
         _loggingService.Log(message);
     }
 
-    private async Task BuildVanillaScriptIndex()
+    private async Task BuildGameScriptIndex()
     {
         await Task.Run(async () =>
         {
-            _gameFileService.BuildGameScriptIndex();
+            _scriptFileService.BuildGameScriptsIndex();
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                Log($"Indexed {_gameFileService.GetScriptIndexCount()} vanilla script archives");
+                Log($"Indexed {_scriptFileService.GetScriptIndexCount()} vanilla script archives");
                 StatusMessage = "Ready - Vanilla script archives indexed";
             });
         });
@@ -125,15 +125,15 @@ public partial class MainViewModel : ObservableObject
         if (mods is not null)
         {
             Log($"Detected {mods.Count} staged mods");
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            await Application.Current.Dispatcher.InvokeAsync(async () =>
             {
                 LoadedMods.Clear();
                 foreach (var mod in mods)
                     LoadedMods.Add(mod);
+
+                await DetectConflictsAsync();
             });
         }
-
-        await DetectConflictsAsync();
     }
 
     private async Task DetectConflictsAsync()
@@ -172,7 +172,7 @@ public partial class MainViewModel : ObservableObject
         {
             Log($"Game path set: {GamePath}");
             UserContentPath = _configService.UserContentPath;
-            await BuildVanillaScriptIndex();
+            await BuildGameScriptIndex();
         }
         else
         {
@@ -242,12 +242,15 @@ public partial class MainViewModel : ObservableObject
                 if (archive.IsLoaded)
                 {
                     LoadedMods.Add(archive);
+                    foreach (var modFile in archive.Files.Where(f => f.Type is ModFileType.Dzip))
+                        _scriptFileService.AddScript(modFile.Name);
+
                     Log($"Mod {archive.ModName} staged");
                 }
                 else Log(archive.Error ?? "Failed to add mod: Unknown error");
             }
 
-            UpdateLoadedModsList();
+            await UpdateLoadedModsList();
             await DetectConflictsAsync();
 
             IsBusy = false;
@@ -256,7 +259,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void RemoveMod(ModArchive? mod)
+    private async Task RemoveMod(ModArchive? mod)
     {
         if (mod is null)
             return;
@@ -267,11 +270,12 @@ public partial class MainViewModel : ObservableObject
             DirectoryUtils.ClearDirectory(modPath);
             Directory.Delete(modPath);
             LoadedMods.Remove(mod);
-            UpdateLoadedModsList();
+            await UpdateLoadedModsList();
             Log($"Removed: {mod.ModName}");
 
             // Re-detect conflicts
-            Task.Run(async () => { await Application.Current.Dispatcher.InvokeAsync(async () => await DetectConflictsAsync()); });
+            await Task.Run(async () => { await Application.Current.Dispatcher.InvokeAsync(async () => await DetectConflictsAsync()); });
+
         }
         catch (Exception ex)
         {
@@ -280,14 +284,14 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ClearMods()
+    private async Task ClearMods()
     {
         try
         {
             DirectoryUtils.ClearDirectory(_configService.ModStagingPath);
             LoadedMods.Clear();
             Conflicts.Clear();
-            UpdateLoadedModsList();
+            await UpdateLoadedModsList();
             Log("Purged all mods");
             StatusMessage = "Ready";
         }
@@ -297,7 +301,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    /*[RelayCommand]
     private async Task AutoMergeAll()
     {
         if (Conflicts.Count == 0)
@@ -314,7 +318,7 @@ public partial class MainViewModel : ObservableObject
 
         foreach (var conflict in Conflicts)
         {
-            if (conflict.Status is not ConflictStatus.Pending)
+            if (conflict.Status is not ConflictStatus.Unresolved)
                 continue;
 
             var success = await Task.Run(() => _mergeService.TryAutoMerge(conflict));
@@ -406,7 +410,7 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        var pendingConflicts = Conflicts.Where(c => c.Status == ConflictStatus.Pending).ToList();
+        var pendingConflicts = Conflicts.Where(c => c.Status == ConflictStatus.Unresolved).ToList();
         if (pendingConflicts.Count != 0)
         {
             var result = MessageBox.Show(
@@ -475,5 +479,5 @@ public partial class MainViewModel : ObservableObject
         {
             IsBusy = false;
         }
-    }
+    }*/
 }

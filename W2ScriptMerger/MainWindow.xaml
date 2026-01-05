@@ -127,32 +127,34 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <Ellipse Grid.Column="0" Width="10" Height="10" Margin="0,0,8,0">
+                                <Ellipse Grid.Column="0" Width="10" Height="10" Margin="0,5,8,0" VerticalAlignment="Top">
                                     <Ellipse.Style>
                                         <Style TargetType="Ellipse">
-                                            <Setter Property="Fill" Value="#FFA500"/>
+                                            <Setter Property="Fill" Value="#FF4444"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Status}" Value="AutoMerged">
+                                                <DataTrigger Binding="{Binding Status}" Value="AutoResolved">
                                                     <Setter Property="Fill" Value="#32CD32"/>
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding Status}" Value="ManuallyMerged">
+                                                <DataTrigger Binding="{Binding Status}" Value="ManuallyResolved">
                                                     <Setter Property="Fill" Value="#1E90FF"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Status}" Value="Failed">
-                                                    <Setter Property="Fill" Value="#FF4444"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Ellipse.Style>
                                 </Ellipse>
 
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="{Binding FileName}" FontWeight="Medium"/>
-                                    <TextBlock Text="{Binding RelativePath}" FontSize="10" Foreground="#888888" TextTrimming="CharacterEllipsis"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Top">
+                                    <TextBlock Text="{Binding OriginalFileName}" FontWeight="Medium"/>
+                                    <TextBlock Text="{Binding OriginalFilePath}" FontSize="10" Foreground="#888888" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="Conflicting Files:" FontSize="10" Foreground="#888888" Margin="0,0,0,0"/>
+                                    <ItemsControl ItemsSource="{Binding ConflictingFilePaths}" Margin="10,0,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" FontSize="10" Foreground="#AAAAAA" TextTrimming="CharacterEllipsis"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
-
-                                <TextBlock Grid.Column="2" Text="{Binding ModVersions.Count, StringFormat='{}{0} mods'}"
-                                           FontSize="11" Foreground="#888888" VerticalAlignment="Center"/>
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>

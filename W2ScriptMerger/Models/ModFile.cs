@@ -1,15 +1,17 @@
 using System.IO;
 using System.Text.Json.Serialization;
+using W2ScriptMerger.Extensions;
 
 namespace W2ScriptMerger.Models;
 
 public class ModFile
 {
     public string RelativePath { get; init; } = string.Empty;
+    public string Name => Path.GetFileName(RelativePath.NormalizePath());
+    public ModFileType Type => GetFileType(Path.GetExtension(RelativePath));
+
     [JsonIgnore]
     public byte[] Content { get; init; } = [];
-
-    public ModFileType FileType => GetFileType(Path.GetExtension(RelativePath));
 
     private static ModFileType GetFileType(string extension)
     {
