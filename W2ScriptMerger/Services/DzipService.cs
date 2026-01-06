@@ -18,18 +18,9 @@ public static class DzipService
     private const uint DzipVersion = 2;
 
     /// <summary>
-    /// Reads every entry in a <c>.dzip</c> file and returns metadata for them.
-    /// </summary>
-    public static List<DzipEntry> UnpackDzip(string filePath)
-    {
-        using var stream = File.OpenRead(filePath);
-        return UnpackDzip(stream);
-    }
-
-    /// <summary>
     /// Core reader that walks the DZIP header and entry table from an open stream.
     /// </summary>
-    private static List<DzipEntry> UnpackDzip(Stream? stream)
+    private static List<DzipEntry> ReadDzip(Stream? stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
         using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true);
@@ -63,7 +54,7 @@ public static class DzipService
             {
                 Name = name,
                 TimeStamp = DateTime.FromFileTime(reader.ReadInt64()),
-                UncompressedSize = reader.ReadInt64(),
+                ExpectedUncompressedSize = reader.ReadInt64(),
                 Offset = reader.ReadInt64(),
                 CompressedSize = reader.ReadInt64()
             };
@@ -74,54 +65,52 @@ public static class DzipService
     }
 
     /// <summary>
-    /// Extracts a single entry from a <c>.dzip</c> given its metadata.
+    /// Extracts every entry in the archive to a directory tree, preserving timestamps.
     /// </summary>
-    public static byte[] ExtractEntry(string dzipPath, DzipEntry entry)
+    /// <param name="dzipPath">Path to the DZIP archive to extract</param>
+    /// <param name="outputDirectory">Directory to extract the archive to</param>
+    /// <returns>Full path to the extracted directory</returns>
+    public static string UnpackDzip(string dzipPath, string outputDirectory)
     {
         using var stream = File.OpenRead(dzipPath);
-        return ExtractEntry(stream, entry);
+        var entries = ReadDzip(stream);
+
+        var outputDirectoryBase = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "dzip_processing", outputDirectory);
+        foreach (var entry in entries)
+        {
+            var outputPath = Path.Combine(outputDirectoryBase, entry.Name.Replace('/', Path.DirectorySeparatorChar));
+            var @out = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(@out))
+                Directory.CreateDirectory(@out);
+
+            var data = UnpackDzipEntry(stream, entry);
+            File.WriteAllBytes(outputPath, data);
+            File.SetLastWriteTime(outputPath, entry.TimeStamp);
+        }
+
+        return outputDirectoryBase;
     }
 
     /// <summary>
     /// Reads the raw bytes of an entry, inflating LZF-compressed payloads when needed.
     /// </summary>
-    private static byte[] ExtractEntry(Stream? stream, DzipEntry entry)
+    private static byte[] UnpackDzipEntry(Stream? stream, DzipEntry entry)
     {
         ArgumentNullException.ThrowIfNull(stream);
         stream.Seek(entry.Offset, SeekOrigin.Begin);
         var compressedData = new byte[entry.CompressedSize];
         stream.ReadExactly(compressedData, 0, (int)entry.CompressedSize);
 
-        if (entry.CompressedSize == entry.UncompressedSize)
+        // Data is not compressed, return as-is
+        if (entry.CompressedSize == entry.ExpectedUncompressedSize)
             return compressedData;
 
-        // Data is LZF compressed
-        var uncompressed = new byte[entry.UncompressedSize];
-        var read = Lzf.Decompress(compressedData, uncompressed);
-        return read != entry.UncompressedSize
-            ? throw new InvalidOperationException($"Decompression failed: expected {entry.UncompressedSize} bytes, got {read}")
+        // Data is LZF compressed, decompress with LZF
+        var uncompressed = new byte[entry.ExpectedUncompressedSize];
+        var uncompressedSize = Lzf.Decompress(compressedData, uncompressed);
+        return uncompressedSize != entry.ExpectedUncompressedSize
+            ? throw new InvalidOperationException($"Decompression failed: expected {entry.ExpectedUncompressedSize} bytes, got {uncompressedSize}")
             : uncompressed;
-    }
-
-    /// <summary>
-    /// Extracts every entry in the archive to a directory tree, preserving timestamps.
-    /// </summary>
-    public static void ExtractAll(string dzipPath, string outputDirectory)
-    {
-        using var stream = File.OpenRead(dzipPath);
-        var entries = UnpackDzip(stream);
-
-        foreach (var entry in entries)
-        {
-            var outputPath = Path.Combine(outputDirectory, entry.Name.Replace('/', Path.DirectorySeparatorChar));
-            var dir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(dir))
-                Directory.CreateDirectory(dir);
-
-            var data = ExtractEntry(stream, entry);
-            File.WriteAllBytes(outputPath, data);
-            File.SetLastWriteTime(outputPath, entry.TimeStamp);
-        }
     }
 
     /// <summary>
@@ -151,7 +140,7 @@ public static class DzipService
             {
                 Name = relativePath,
                 TimeStamp = fileInfo.LastWriteTime,
-                UncompressedSize = fileData.Length,
+                ExpectedUncompressedSize = fileData.Length,
                 Offset = offset,
                 CompressedSize = compressedSize
             });
@@ -166,7 +155,7 @@ public static class DzipService
             writer.Write((ushort)nameBytes.Length);
             writer.Write(nameBytes);
             writer.Write(entry.TimeStamp.ToFileTime());
-            writer.Write(entry.UncompressedSize);
+            writer.Write(entry.ExpectedUncompressedSize);
             writer.Write(entry.Offset);
             writer.Write(entry.CompressedSize);
         }
@@ -206,7 +195,7 @@ public static class DzipService
 
             hash ^= (ulong)entry.TimeStamp.ToFileTime();  // bake in last-write time
             hash *= 0x00000100000001B3UL;
-            hash ^= (ulong)entry.UncompressedSize;        // uncompressed payload size
+            hash ^= (ulong)entry.ExpectedUncompressedSize;        // uncompressed payload size
             hash *= 0x00000100000001B3UL;
             hash ^= (ulong)entry.Offset;                  // file position inside the archive
             hash *= 0x00000100000001B3UL;

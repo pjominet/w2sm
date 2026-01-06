@@ -6,11 +6,11 @@
 internal static class Lzf
 {
     /// <summary>
-    /// Decompresses the data using LibLZF algorithm
+    /// Decompresses data using LibLZF algorithm
     /// </summary>
-    /// <param name="input">Reference to the data to compress</param>
-    /// <param name="output">Reference to a buffer which will contain the compressed data</param>
-    /// <returns>The size of the compressed archive in the output buffer</returns>
+    /// <param name="input">Reference to the data to decompress</param>
+    /// <param name="output">Reference to a buffer which will contain the decompressed data</param>
+    /// <returns>The size of the decompressed archive in the output buffer</returns>
     public static int Decompress(byte[] input, byte[] output)
     {
         var inputIndex = 0;
@@ -73,7 +73,7 @@ internal static class Lzf
     }
 
     /// <summary>
-    /// Compresses the data using LibLZF algorithm
+    /// Compresses data using LibLZF algorithm
     /// </summary>
     /// <param name="input">Reference to the data to compress</param>
     /// <param name="inputLength">Length of the data to compress</param>

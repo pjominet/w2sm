@@ -1,30 +1,30 @@
 using System.IO;
+using System.Text;
 using DiffPlex;
-using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
-public class MergeService(ScriptFileService scriptFileService)
+public class MergeService(GameFileService gameFileService)
 {
     private readonly Differ _differ = new();
 
-    public List<ScriptConflict> DetectConflicts(List<ModArchive> newModArchives)
+    public List<ModConflict> DetectConflicts(List<ModArchive> newModArchives)
     {
-        var conflicts = new Dictionary<string, ScriptConflict>(StringComparer.OrdinalIgnoreCase);
+        var conflicts = new Dictionary<string, ModConflict>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var modArchive in newModArchives)
         {
             foreach (var file in modArchive.Files)
             {
-                if (!scriptFileService.ScriptExistsIndex(file.Name))
+                if (!gameFileService.DzipIsIndexed(file.Name))
                     continue;
 
-                var conflict = new ScriptConflict
+                var conflict = new ModConflict
                 {
-                    OriginalFilePath = scriptFileService.GetScriptReference(file.Name).GetCurrentScriptPath()
+                    OriginalFile = gameFileService.GetDzipReference(file.Name).GetCurrentScriptPath()
                 };
-                conflict.ConflictingFilePaths.Add($"{modArchive.ModName}/{file.RelativePath}");
+                conflict.ConflictingFiles.Add($"{modArchive.ModName}/{file.RelativePath}");
                 conflicts[file.Name] = conflict;
             }
         }
@@ -32,32 +32,84 @@ public class MergeService(ScriptFileService scriptFileService)
         return conflicts.Values.ToList();
     }
 
-    /*public bool TryAutoMerge(ScriptConflict conflict)
+    public byte[]? AttemptAutoMerge(ModConflict conflict)
     {
-        var baseContent = conflict.VanillaContent ?? [];
-        var baseText = Encoding.UTF8.GetString(baseContent);
+        // Unpack the base (vanilla) dzip to access its script files for comparison and merging
+        var baseFilePath = DzipService.UnpackDzip(conflict.OriginalFile, $"vanilla_{conflict.OriginalFileName}");
+        var scriptConflicts = new List<ScriptConflict>();
+        var modCount = 1;
 
-        // Try three-way merge for each mod version
-        var currentMerged = baseText;
-
-        foreach (var modVersion in conflict.ModVersions)
+        // Iterate through each conflicting mod file to unpack and collect script conflicts
+        foreach (var conflictingFile in conflict.ConflictingFiles)
         {
-            var modText = Encoding.UTF8.GetString(modVersion.Content);
-
-            var mergeResult = ThreeWayMerge(baseText, currentMerged, modText);
-            if (mergeResult.HasConflicts)
+            // Unpack the mod dzip to access its script files
+            var modFilePath = DzipService.UnpackDzip(conflictingFile, $"mod{modCount++}_{Path.GetFileName(conflictingFile)}");
+            var modScripts = Directory.GetFiles(modFilePath, "*.ws", SearchOption.AllDirectories);
+            foreach (var modScript in modScripts)
             {
-                conflict.Status = ConflictStatus.Unresolved;
-                return false;
+                // Calculate the relative path of the script within the dzip for matching with base scripts
+                var relativeScriptPath = Path.GetRelativePath(modFilePath, modScript);
+                var baseScript = Path.Combine(baseFilePath, relativeScriptPath);
+                if (File.Exists(baseScript)) // sanity check: only create a conflict for scripts that exist in the vanilla dzip
+                {
+                    // Start with the base content for the first merg
+                    scriptConflicts.Add(new ScriptConflict
+                    {
+                        DzipSource = Path.GetFileName(conflict.OriginalFile),
+                        RelativeScriptPath = relativeScriptPath,
+                        BaseScriptContent = File.ReadAllBytes(baseScript),
+                        ConflictScriptContent = File.ReadAllBytes(modScript)
+                    });
+                }
             }
-
-            currentMerged = mergeResult.MergedText;
         }
 
-        conflict.MergedContent = Encoding.UTF8.GetBytes(currentMerged);
-        conflict.Status = ConflictStatus.AutoMerged;
-        return true;
-    }*/
+        byte[] currentMerge = [];
+        // Group conflicts by script path to handle multiple mods modifying the same script incrementally
+        var groupedConflicts = scriptConflicts.GroupBy(sc => sc.RelativeScriptPath);
+        foreach (var group in groupedConflicts)
+        {
+            // Order conflicts by mod sequence (based on order in ConflictingFiles) to apply mods in the correct order,
+            // ensuring inter mod conflicts are properly dealt with during incremental merging
+            var orderedConflicts = group.OrderBy(sc => Array.IndexOf([.. conflict.ConflictingFiles], sc.DzipSource)).ToList(); // order by mod sequence
+            // Start with the base content for the first merge
+            currentMerge = orderedConflicts[0].BaseScriptContent;
+            foreach (var scriptConflict in orderedConflicts)
+            {
+                // Attempt to merge the current merge with this mod's changes
+                var merged = AttemptAutoMerge(currentMerge, scriptConflict.ConflictScriptContent);
+                if (merged is null)
+                {
+                    // If merge failed due to auto unresolvable conflicts, flag the conflict as needing manual resolution and stop merge
+                    conflict.Status = ConflictStatus.NeedsManualResolution;
+                    return null;
+                }
+
+                // Update current content with the merged result for the next mod in sequence
+                currentMerge = merged;
+            }
+        }
+
+        conflict.Status = ConflictStatus.AutoResolved;
+        return currentMerge;
+    }
+
+    private byte[]? AttemptAutoMerge(byte[] baseScriptContent, byte[] conflictScriptContent)
+    {
+        var baseText = Encoding.GetEncoding(1250).GetString(baseScriptContent);
+        var modText = Encoding.GetEncoding(1250).GetString(conflictScriptContent);
+
+        // Try three-way merge
+        var currentMerged = baseText;
+
+        var mergeResult = ThreeWayMerge(baseText, currentMerged, modText);
+        if (mergeResult.HasConflicts)
+            return null;
+
+        currentMerged = mergeResult.MergedText;
+
+        return Encoding.GetEncoding(1250).GetBytes(currentMerged);
+    }
 
     private MergeResult ThreeWayMerge(string baseText, string leftText, string rightText)
     {
@@ -108,7 +160,7 @@ public class MergeService(ScriptFileService scriptFileService)
         // Sort operations by position descending to apply from end to beginning, avoiding index shifts
         operations = operations.OrderByDescending(o => o.Position).ToList();
 
-        // Start with base lines
+        // Start with baselines
         var mergedLines = baseLines.ToList();
 
         // Apply each operation

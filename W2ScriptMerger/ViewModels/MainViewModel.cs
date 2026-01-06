@@ -18,7 +18,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly ConfigService _configService;
     private readonly ArchiveService _archiveService;
-    private readonly ScriptFileService _scriptFileService;
+    private readonly GameFileService _gameFileService;
     private readonly MergeService _mergeService;
     private readonly InstallService _installService;
     private readonly LoggingService _loggingService;
@@ -43,24 +43,24 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private InstallLocation _selectedInstallLocation = InstallLocation.UserContent;
 
-    [ObservableProperty] private ScriptConflict? _selectedConflict;
+    [ObservableProperty] private ModConflict? _selectedConflict;
 
     [ObservableProperty] private string _diffViewText = string.Empty;
 
     [ObservableProperty] private string _logText = string.Empty;
 
     public ObservableCollection<ModArchive> LoadedMods { get; } = [];
-    public ObservableCollection<ScriptConflict> Conflicts { get; } = [];
+    public ObservableCollection<ModConflict> Conflicts { get; } = [];
     private ObservableCollection<string> LogMessages { get; } = [];
 
     public MainViewModel()
     {
         _loggingService = new LoggingService();
         _configService = new ConfigService(_jsonSerializerOptions);
-        _scriptFileService = new ScriptFileService(_configService);
+        _gameFileService = new GameFileService(_configService);
         _archiveService = new ArchiveService(_configService);
         _installService = new InstallService(_configService);
-        _mergeService = new MergeService(_scriptFileService);
+        _mergeService = new MergeService(_gameFileService);
 
         GamePath = _configService.GamePath ?? string.Empty;
         ModStagingPath = _configService.ModStagingPath;
@@ -105,10 +105,10 @@ public partial class MainViewModel : ObservableObject
     {
         await Task.Run(async () =>
         {
-            _scriptFileService.BuildGameScriptsIndex();
+            _gameFileService.BuildDzipIndex();
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                Log($"Indexed {_scriptFileService.GetScriptIndexCount()} vanilla script archives");
+                Log($"Indexed {_gameFileService.GetDzipIndexCount()} vanilla script archives");
                 StatusMessage = "Ready - Vanilla script archives indexed";
             });
         });
@@ -243,7 +243,7 @@ public partial class MainViewModel : ObservableObject
                 {
                     LoadedMods.Add(archive);
                     foreach (var modFile in archive.Files.Where(f => f.Type is ModFileType.Dzip))
-                        _scriptFileService.AddScript(modFile.Name);
+                        _gameFileService.AddDzip(modFile.Name);
 
                     Log($"Mod {archive.ModName} staged");
                 }
@@ -301,7 +301,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    /*[RelayCommand]
+    [RelayCommand]
     private async Task AutoMergeAll()
     {
         if (Conflicts.Count == 0)
@@ -311,7 +311,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         IsBusy = true;
-        StatusMessage = "Auto-merging...";
+        StatusMessage = "Attempting Auto-merge...";
 
         var autoMerged = 0;
         var failed = 0;
@@ -321,16 +321,19 @@ public partial class MainViewModel : ObservableObject
             if (conflict.Status is not ConflictStatus.Unresolved)
                 continue;
 
-            var success = await Task.Run(() => _mergeService.TryAutoMerge(conflict));
-            if (success)
+            var resultingMerge = await Task.Run(() => _mergeService.AttemptAutoMerge(conflict));
+            if (conflict.Status is ConflictStatus.AutoResolved)
             {
                 autoMerged++;
-                Log($"Auto-merged: {conflict.FileName}");
+                // TODO: Save the merged file, make sure to not install dzip from conflicting mods, install merge instead
+                Log($"Auto-merged: {conflict.OriginalFileName}");
             }
             else
             {
                 failed++;
-                Log($"Needs manual merge: {conflict.FileName}");
+                var conflictFiles = string.Join(", ", conflict.ConflictingFiles
+                    .Select(Path.GetFileName));
+                Log($"Needs manual merge: {conflictFiles} >> {conflict.OriginalFileName}");
             }
         }
 
@@ -338,7 +341,7 @@ public partial class MainViewModel : ObservableObject
         StatusMessage = $"Auto-merged {autoMerged} files, {failed} need manual intervention";
     }
 
-    [RelayCommand]
+    /*[RelayCommand]
     private void ViewConflictDiff()
     {
         if (SelectedConflict is null)

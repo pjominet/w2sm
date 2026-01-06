@@ -145,8 +145,8 @@
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Top">
                                     <TextBlock Text="{Binding OriginalFileName}" FontWeight="Medium"/>
-                                    <TextBlock Text="{Binding OriginalFilePath}" FontSize="10" Foreground="#888888" TextTrimming="CharacterEllipsis"/>
-                                    <ItemsControl ItemsSource="{Binding ConflictingFilePaths}" Margin="0,3,0,0">
+                                    <TextBlock Text="{Binding OriginalFile}" FontSize="10" Foreground="#888888" TextTrimming="CharacterEllipsis"/>
+                                    <ItemsControl ItemsSource="{Binding ConflictingFiles}" Margin="0,3,0,0">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal">
@@ -167,7 +167,7 @@
                 <!-- Diff Actions -->
                 <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10">
                     <Button Content="🔄 Auto Merge" Command="{Binding AutoMergeAllCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,8,0"/>
-                    <Button Content="✏ Open Merge Editor" Command="{Binding OpenMergeEditorCommand}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
+                    <Button Content="✏ Merge Manually" Command="{Binding OpenMergeEditorCommand}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
                     <Button Content="👁 View Diff" Command="{Binding ViewConflictDiffCommand}" Style="{StaticResource DarkButton}"/>
                 </StackPanel>
 

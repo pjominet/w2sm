@@ -1,6 +1,6 @@
 ﻿namespace W2ScriptMerger.Models;
 
-public class ScriptReference
+public class DzipReference
 {
     public SortedDictionary<int, string> OverrideHistory { get; set; } = [];
 

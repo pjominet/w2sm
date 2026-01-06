@@ -12,7 +12,7 @@ namespace W2ScriptMerger.Views;
 
 public partial class DiffMergeWindow
 {
-    private readonly ScriptConflict _conflict;
+    private readonly ModConflict _conflict;
     private readonly Differ _differ = new();
     private int _selectedModIndex;
     private bool _isSyncingScroll;
@@ -20,7 +20,7 @@ public partial class DiffMergeWindow
     public bool MergeAccepted { get; private set; }
     public byte[]? MergedContent { get; private set; }
 
-    public DiffMergeWindow(ScriptConflict conflict)
+    public DiffMergeWindow(ModConflict conflict)
     {
         InitializeComponent();
         _conflict = conflict;
