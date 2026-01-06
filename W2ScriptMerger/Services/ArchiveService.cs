@@ -11,14 +11,14 @@ public class ArchiveService(ConfigService configService)
     {
         var modArchive = new ModArchive
         {
-            FilePath = archivePath
+            SourcePath = archivePath
         };
 
         try
         {
             // create mod folder in staging directory
-            var outputDir = Path.Combine(configService.ModStagingPath, modArchive.ModName);
-            Directory.CreateDirectory(outputDir);
+            modArchive.StagingPath = Path.Combine(configService.ModStagingPath, modArchive.ModName);
+            Directory.CreateDirectory(modArchive.StagingPath);
 
             using (var archive = ArchiveFactory.Open(archivePath))
             {
@@ -34,21 +34,21 @@ public class ArchiveService(ConfigService configService)
                     if (normalizedPath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    string relativePath;
-                    if (normalizedPath.StartsWith("CookedPc/", StringComparison.OrdinalIgnoreCase))
+                    string fileStagingPath;
+                    if (normalizedPath.StartsWith("CookedPC/", StringComparison.OrdinalIgnoreCase))
                     {
                         modArchive.ModInstallLocation = InstallLocation.CookedPC;
-                        relativePath = normalizedPath["CookedPc/".Length..];
+                        fileStagingPath = $"CookedPC/{normalizedPath}";
                     }
                     else if (normalizedPath.StartsWith("UserContent/", StringComparison.OrdinalIgnoreCase))
                     {
                         modArchive.ModInstallLocation = InstallLocation.UserContent;
-                        relativePath = normalizedPath["UserContent/".Length..];
+                        fileStagingPath = $"UserContent/{normalizedPath}";
                     }
                     else
                     {
                         modArchive.ModInstallLocation = InstallLocation.Unknown;
-                        relativePath = normalizedPath;
+                        fileStagingPath = $"CookedPC/{normalizedPath}"; // assume CookedPC for now
                     }
 
                     await using var entryStream = await entry.OpenEntryStreamAsync(ctx ?? CancellationToken.None);
@@ -57,9 +57,9 @@ public class ArchiveService(ConfigService configService)
                     ms.Position = 0;
 
                     // Extract to file
-                    var extractedFilePath = Path.Combine(outputDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
-                    Directory.CreateDirectory(Path.GetDirectoryName(extractedFilePath)!);
-                    await using (var fileStream = File.Create(extractedFilePath))
+                    var stagingPath = Path.Combine(modArchive.StagingPath, fileStagingPath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);
+                    await using (var fileStream = File.Create(stagingPath))
                     {
                         await ms.CopyToAsync(fileStream);
                     }
@@ -67,7 +67,7 @@ public class ArchiveService(ConfigService configService)
                     // Create ModFile reference
                     modArchive.Files.Add(new ModFile
                     {
-                        RelativePath = relativePath,
+                        RelativePath = fileStagingPath,
                         Content = ms.ToArray()
                     });
                 }

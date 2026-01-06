@@ -1,6 +1,6 @@
 using System.IO;
-using System.Text;
 using DiffPlex;
+using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
@@ -24,7 +24,7 @@ public class MergeService(ScriptFileService scriptFileService)
                 {
                     OriginalFilePath = scriptFileService.GetScriptReference(file.Name).GetCurrentScriptPath()
                 };
-                conflict.ConflictingFilePaths.Add(Path.Combine(modArchive.FilePath, file.RelativePath));
+                conflict.ConflictingFilePaths.Add($"{modArchive.ModName}/{file.RelativePath}");
                 conflicts[file.Name] = conflict;
             }
         }

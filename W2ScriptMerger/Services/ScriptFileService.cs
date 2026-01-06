@@ -43,7 +43,7 @@ public class ScriptFileService(ConfigService configService)
 
     public int GetScriptIndexCount() => _scriptsIndex.Count;
 
-    public bool ScriptExistsIndex(string scriptName) => _scriptsIndex?.ContainsKey(scriptName) ?? false;
+    public bool ScriptExistsIndex(string scriptName) => _scriptsIndex.ContainsKey(scriptName);
 
-    public ScriptReference GetScriptReference(string scriptName) => _scriptsIndex?.GetValueOrDefault(scriptName) ?? throw new KeyNotFoundException();
+    public ScriptReference GetScriptReference(string scriptName) => _scriptsIndex.GetValueOrDefault(scriptName) ?? throw new KeyNotFoundException();
 }
