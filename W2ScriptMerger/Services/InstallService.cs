@@ -27,10 +27,10 @@ public class InstallService(ConfigService configService)
         File.WriteAllBytes(targetPath, file.Content);
     }
 
-    /*public void InstallMergedScript(ScriptConflict conflict, InstallLocation location)
+    public void InstallMergedScript(ModConflict conflict, InstallLocation location)
     {
-        if (conflict.MergedContent is null)
-            throw new InvalidOperationException("No merged content available");
+        if (conflict.MergeContent is null)
+            return;
 
         var basePath = GetInstallPath(location);
         var targetPath = Path.Combine(basePath, conflict.RelativePath.Replace('/', Path.DirectorySeparatorChar));
@@ -39,7 +39,7 @@ public class InstallService(ConfigService configService)
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
 
-        File.WriteAllBytes(targetPath, conflict.MergedContent);
+        File.WriteAllBytes(targetPath, conflict.MergeContent);
     }
 
     public void InstallNonConflictingFiles(ModArchive archive, InstallLocation location, HashSet<string> conflictPaths)
@@ -94,28 +94,35 @@ public class InstallService(ConfigService configService)
         File.Copy(backupPath, targetPath, overwrite: true);
     }
 
-    public void CreateDzipFromMergedScripts(List<ScriptConflict> mergedConflicts, string outputPath)
+    public void CreateDzipFromMergedScripts(List<ModConflict> mergedConflicts, string outputPath)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "W2ScriptMerger_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
 
         try
         {
-            foreach (var conflict in mergedConflicts.Where(c => c.MergedContent is not null))
+            foreach (var conflict in mergedConflicts.Where(c => c.MergeContent is not null))
             {
                 var filePath = Path.Combine(tempDir, conflict.RelativePath.Replace('/', Path.DirectorySeparatorChar));
                 var dir = Path.GetDirectoryName(filePath);
                 if (!string.IsNullOrEmpty(dir))
                     Directory.CreateDirectory(dir);
 
-                File.WriteAllBytes(filePath, conflict.MergedContent!);
+                File.WriteAllBytes(filePath, conflict.MergeContent!);
             }
 
             DzipService.PackDzip(outputPath, tempDir);
         }
         finally
         {
-            try { Directory.Delete(tempDir, recursive: true); } catch { }
+            try
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+            catch
+            {
+                // ignore
+            }
         }
-    }*/
+    }
 }

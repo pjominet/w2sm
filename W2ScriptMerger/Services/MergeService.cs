@@ -32,7 +32,7 @@ public class MergeService(GameFileService gameFileService)
         return conflicts.Values.ToList();
     }
 
-    public byte[]? AttemptAutoMerge(ModConflict conflict)
+    public void AttemptAutoMerge(ModConflict conflict)
     {
         // Unpack the base (vanilla) dzip to access its script files for comparison and merging
         var baseFilePath = DzipService.UnpackDzip(conflict.OriginalFile, $"vanilla_{conflict.OriginalFileName}");
@@ -82,7 +82,7 @@ public class MergeService(GameFileService gameFileService)
                 {
                     // If merge failed due to auto unresolvable conflicts, flag the conflict as needing manual resolution and stop merge
                     conflict.Status = ConflictStatus.NeedsManualResolution;
-                    return null;
+                    return;
                 }
 
                 // Update current content with the merged result for the next mod in sequence
@@ -91,7 +91,7 @@ public class MergeService(GameFileService gameFileService)
         }
 
         conflict.Status = ConflictStatus.AutoResolved;
-        return currentMerge;
+        conflict.MergeContent = currentMerge;
     }
 
     private byte[]? AttemptAutoMerge(byte[] baseScriptContent, byte[] conflictScriptContent)

@@ -321,11 +321,10 @@ public partial class MainViewModel : ObservableObject
             if (conflict.Status is not ConflictStatus.Unresolved)
                 continue;
 
-            var resultingMerge = await Task.Run(() => _mergeService.AttemptAutoMerge(conflict));
+            await Task.Run(() => _mergeService.AttemptAutoMerge(conflict));
             if (conflict.Status is ConflictStatus.AutoResolved)
             {
                 autoMerged++;
-                // TODO: Save the merged file, make sure to not install dzip from conflicting mods, install merge instead
                 Log($"Auto-merged: {conflict.OriginalFileName}");
             }
             else
