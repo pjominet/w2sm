@@ -36,7 +36,7 @@ public class MergeService(GameFileService gameFileService)
     {
         // Unpack the base (vanilla) dzip to access its script files for comparison and merging
         var baseFilePath = DzipService.UnpackDzip(conflict.OriginalFile, $"vanilla_{conflict.OriginalFileName}");
-        var scriptConflicts = new List<ScriptConflict>();
+        var scriptConflictsToResolve = new List<ScriptConflict>();
         var modCount = 1;
 
         // Iterate through each conflicting mod file to unpack and collect script conflicts
@@ -52,8 +52,8 @@ public class MergeService(GameFileService gameFileService)
                 var baseScript = Path.Combine(baseFilePath, relativeScriptPath);
                 if (File.Exists(baseScript)) // sanity check: only create a conflict for scripts that exist in the vanilla dzip
                 {
-                    // Start with the base content for the first merg
-                    scriptConflicts.Add(new ScriptConflict
+                    // Start with the base content for the first merge
+                    scriptConflictsToResolve.Add(new ScriptConflict
                     {
                         DzipSource = Path.GetFileName(conflict.OriginalFile),
                         RelativeScriptPath = relativeScriptPath,
@@ -65,16 +65,14 @@ public class MergeService(GameFileService gameFileService)
         }
 
         byte[] currentMerge = [];
-        // Group conflicts by script path to handle multiple mods modifying the same script incrementally
-        var groupedConflicts = scriptConflicts.GroupBy(sc => sc.RelativeScriptPath);
+        // Group conflicts by script path to handle multiple mods modifying the same script
+        var groupedConflicts = scriptConflictsToResolve.GroupBy(sc => sc.RelativeScriptPath);
         foreach (var group in groupedConflicts)
         {
-            // Order conflicts by mod sequence (based on order in ConflictingFiles) to apply mods in the correct order,
-            // ensuring inter mod conflicts are properly dealt with during incremental merging
-            var orderedConflicts = group.OrderBy(sc => Array.IndexOf([.. conflict.ConflictingFiles], sc.DzipSource)).ToList(); // order by mod sequence
-            // Start with the base content for the first merge
-            currentMerge = orderedConflicts[0].BaseScriptContent;
-            foreach (var scriptConflict in orderedConflicts)
+            // Process all mod conflicts for this script
+            var conflictsForScript = group.ToList();
+            currentMerge = conflictsForScript[0].BaseScriptContent;
+            foreach (var scriptConflict in conflictsForScript)
             {
                 // Attempt to merge the current merge with this mod's changes
                 var merged = AttemptAutoMerge(currentMerge, scriptConflict.ConflictScriptContent);

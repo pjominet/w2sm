@@ -132,6 +132,9 @@
                                         <Style TargetType="Ellipse">
                                             <Setter Property="Fill" Value="#FF4444"/>
                                             <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Status}" Value="NeedsManualResolution">
+                                                    <Setter Property="Fill" Value="#E37308"/>
+                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding Status}" Value="AutoResolved">
                                                     <Setter Property="Fill" Value="#32CD32"/>
                                                 </DataTrigger>
