@@ -359,7 +359,7 @@ public partial class MainViewModel : ObservableObject
 
         foreach (var mod in SelectedConflict.ModVersions)
         {
-            sb.AppendLine($"--- MOD: {mod.SourceArchive} ---");
+            sb.AppendLine($"--- MOD: {mod.DzipSource} ---");
             sb.AppendLine(Encoding.GetEncoding(1250).GetString(mod.Content));
             sb.AppendLine();
         }

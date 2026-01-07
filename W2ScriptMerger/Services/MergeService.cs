@@ -67,18 +67,18 @@ public class MergeService(GameFileService gameFileService)
         byte[] currentMerge = [];
         // Group conflicts by script path to handle multiple mods modifying the same script
         var groupedConflicts = scriptConflictsToResolve.GroupBy(sc => sc.RelativeScriptPath).ToList();
-        if (groupedConflicts.Count == 0)
-            return; // no conflicts to resolve
+        if (groupedConflicts.Count == 0) // sanity check: no conflicts to resolve
+            return;
 
         foreach (var group in groupedConflicts)
         {
             // Process all mod conflicts for this script
             var conflictsForScript = group.ToList();
             currentMerge = conflictsForScript[0].BaseScriptContent;
-            foreach (var scriptConflict in conflictsForScript)
+            foreach (var sc in conflictsForScript)
             {
                 // Attempt to merge the current merge with this mod's changes
-                var merged = AttemptAutoMerge(currentMerge, scriptConflict.ConflictScriptContent);
+                var merged = AttemptAutoMerge(currentMerge, sc.ConflictScriptContent);
                 if (merged is null)
                 {
                     // If merge failed due to auto unresolvable conflicts, flag the conflict as needing manual resolution and stop merge
@@ -99,7 +99,7 @@ public class MergeService(GameFileService gameFileService)
             {
                 conflict.ModVersions.Add(new ModVersion
                 {
-                    SourceArchive = sc.DzipSource,
+                    DzipSource = sc.DzipSource,
                     Content = sc.ConflictScriptContent
                 });
             }

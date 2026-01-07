@@ -16,7 +16,7 @@ public class ModConflict
 
 public class ModVersion
 {
-    public required string SourceArchive { get; init; } = string.Empty;
+    public required string DzipSource { get; init; } = string.Empty;
     public required byte[] Content { get; init; } = [];
 }
 
