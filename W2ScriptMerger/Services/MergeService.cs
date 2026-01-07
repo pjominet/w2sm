@@ -66,7 +66,10 @@ public class MergeService(GameFileService gameFileService)
 
         byte[] currentMerge = [];
         // Group conflicts by script path to handle multiple mods modifying the same script
-        var groupedConflicts = scriptConflictsToResolve.GroupBy(sc => sc.RelativeScriptPath);
+        var groupedConflicts = scriptConflictsToResolve.GroupBy(sc => sc.RelativeScriptPath).ToList();
+        if (groupedConflicts.Count == 0)
+            return; // no conflicts to resolve
+
         foreach (var group in groupedConflicts)
         {
             // Process all mod conflicts for this script
@@ -85,6 +88,20 @@ public class MergeService(GameFileService gameFileService)
 
                 // Update current content with the merged result for the next mod in sequence
                 currentMerge = merged;
+            }
+
+            // Populate diff viewer content from the first script group only
+            if (group.Key != groupedConflicts[0].Key)
+                continue;
+
+            conflict.VanillaContent = conflictsForScript[0].BaseScriptContent;
+            foreach (var sc in conflictsForScript)
+            {
+                conflict.ModVersions.Add(new ModVersion
+                {
+                    SourceArchive = sc.DzipSource,
+                    Content = sc.ConflictScriptContent
+                });
             }
         }
 

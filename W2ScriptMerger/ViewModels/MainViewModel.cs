@@ -340,7 +340,7 @@ public partial class MainViewModel : ObservableObject
         StatusMessage = $"Auto-merged {autoMerged} files, {failed} need manual intervention";
     }
 
-    /*[RelayCommand]
+    [RelayCommand]
     private void ViewConflictDiff()
     {
         if (SelectedConflict is null)
@@ -353,21 +353,21 @@ public partial class MainViewModel : ObservableObject
         if (SelectedConflict.VanillaContent is not null)
         {
             sb.AppendLine("--- VANILLA VERSION ---");
-            sb.AppendLine(Encoding.UTF8.GetString(SelectedConflict.VanillaContent));
+            sb.AppendLine(Encoding.GetEncoding(1250).GetString(SelectedConflict.VanillaContent));
             sb.AppendLine();
         }
 
         foreach (var mod in SelectedConflict.ModVersions)
         {
             sb.AppendLine($"--- MOD: {mod.SourceArchive} ---");
-            sb.AppendLine(Encoding.UTF8.GetString(mod.Content));
+            sb.AppendLine(Encoding.GetEncoding(1250).GetString(mod.Content));
             sb.AppendLine();
         }
 
-        if (SelectedConflict.MergedContent is not null)
+        if (SelectedConflict.MergeContent is not null)
         {
             sb.AppendLine("--- MERGED RESULT ---");
-            sb.AppendLine(Encoding.UTF8.GetString(SelectedConflict.MergedContent));
+            sb.AppendLine(Encoding.GetEncoding(1250).GetString(SelectedConflict.MergeContent));
         }
 
         DiffViewText = sb.ToString();
@@ -387,10 +387,10 @@ public partial class MainViewModel : ObservableObject
         if (mergeWindow.ShowDialog() != true || !mergeWindow.MergeAccepted)
             return;
 
-        SelectedConflict.MergedContent = mergeWindow.MergedContent;
-        SelectedConflict.Status = ConflictStatus.ManuallyMerged;
-        Log($"Manually merged: {SelectedConflict.FileName}");
-        StatusMessage = $"Merged: {SelectedConflict.FileName}";
+        SelectedConflict.MergeContent = mergeWindow.MergedContent;
+        SelectedConflict.Status = ConflictStatus.ManuallyResolved;
+        Log($"Manually merged: {SelectedConflict.OriginalFileName}");
+        StatusMessage = $"Merged: {SelectedConflict.OriginalFileName}";
 
         // Refresh the conflict list to update status indicators
         var index = Conflicts.IndexOf(SelectedConflict);
@@ -462,7 +462,7 @@ public partial class MainViewModel : ObservableObject
 
             // Install merged files
             var mergedCount = 0;
-            foreach (var conflict in Conflicts.Where(c => c.MergedContent is not null))
+            foreach (var conflict in Conflicts.Where(c => c.MergeContent is not null))
             {
                 await Task.Run(() =>
                     _installService.InstallMergedScript(conflict, SelectedInstallLocation));
@@ -481,5 +481,5 @@ public partial class MainViewModel : ObservableObject
         {
             IsBusy = false;
         }
-    }*/
+    }
 }

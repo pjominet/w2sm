@@ -6,10 +6,18 @@ public class ModConflict
 {
     public required string OriginalFile { get; init; } = string.Empty;
     public string OriginalFileName => Path.GetFileName(OriginalFile);
+    public byte[]? VanillaContent { get; set; }
+    public List<ModVersion> ModVersions { get; } = [];
     public string RelativePath => Path.GetRelativePath(OriginalFile, OriginalFileName);
     public List<string> ConflictingFiles { get; } = [];
     public ConflictStatus Status { get; set; } = ConflictStatus.Unresolved;
     public byte[]? MergeContent { get; set; }
+}
+
+public class ModVersion
+{
+    public required string SourceArchive { get; init; } = string.Empty;
+    public required byte[] Content { get; init; } = [];
 }
 
 public enum ConflictStatus
