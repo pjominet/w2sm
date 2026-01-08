@@ -24,7 +24,7 @@ public class ArchiveService(ConfigService configService)
             {
                 foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
                 {
-                    var normalizedPath = entry.Key.NormalizePath();
+                    var normalizedPath = DetermineRelativeModFilePath(entry.Key);
 
                     // ignore empty entries
                     if (!normalizedPath.HasValue())
@@ -38,17 +38,17 @@ public class ArchiveService(ConfigService configService)
                     if (normalizedPath.StartsWith("CookedPC/", StringComparison.OrdinalIgnoreCase))
                     {
                         modArchive.ModInstallLocation = InstallLocation.CookedPC;
-                        fileStagingPath = $"CookedPC/{normalizedPath}";
+                        fileStagingPath = normalizedPath;
                     }
                     else if (normalizedPath.StartsWith("UserContent/", StringComparison.OrdinalIgnoreCase))
                     {
                         modArchive.ModInstallLocation = InstallLocation.UserContent;
-                        fileStagingPath = $"UserContent/{normalizedPath}";
+                        fileStagingPath = normalizedPath;
                     }
                     else
                     {
                         modArchive.ModInstallLocation = InstallLocation.Unknown;
-                        fileStagingPath = $"CookedPC/{normalizedPath}"; // assume CookedPC for now
+                        fileStagingPath = $"CookedPC/{normalizedPath}"; // assume CookedPC for loose files & folders
                     }
 
                     await using var entryStream = await entry.OpenEntryStreamAsync(ctx ?? CancellationToken.None);
@@ -82,5 +82,38 @@ public class ArchiveService(ConfigService configService)
         }
 
         return modArchive;
+    }
+
+    /// <summary>
+    /// Determines the relative path for a mod file by trimming the archive path to start from the first valid root directory
+    /// ("CookedPc" or "UserContent", case-insensitive) encountered when traversing upwards from the file.
+    /// This prevents nesting issues where archives contain multiple root directories, ensuring only the deepest valid root is used
+    /// (as per game folder structure expectations). If no valid root is found, returns the original normalized path.
+    /// </summary>
+    /// <param name="archivePath">The raw archive entry path to the file.</param>
+    /// <returns>The relative path starting from the appropriate root, or the original normalized path if no root found.</returns>
+    private static string DetermineRelativeModFilePath(string? archivePath)
+    {
+        if (!archivePath.HasValue())
+            return string.Empty;
+
+        var segments = archivePath.NormalizePath().Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var rootIndex = -1;
+
+        // Find the index of the first "cookedpc" or "usercontent" starting from the bottom (closest to the file)
+        for (var i = segments.Length - 1; i >= 0; i--)
+        {
+            var seg = segments[i].ToLowerInvariant();
+            if (seg is not ("cookedpc" or "usercontent"))
+                continue;
+
+            rootIndex = i;
+            break;
+        }
+
+        // If a root was found, return the path from that root onwards; otherwise, return the original normalized path
+        return rootIndex >= 0
+            ? string.Join("/", segments.Skip(rootIndex))
+            : archivePath!;
     }
 }
