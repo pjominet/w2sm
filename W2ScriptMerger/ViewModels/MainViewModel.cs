@@ -353,21 +353,21 @@ public partial class MainViewModel : ObservableObject
         if (SelectedConflict.VanillaContent is not null)
         {
             sb.AppendLine("--- VANILLA VERSION ---");
-            sb.AppendLine(Encoding.GetEncoding(1250).GetString(SelectedConflict.VanillaContent));
+            sb.AppendLine(Encoding.ANSI1250.GetString(SelectedConflict.VanillaContent));
             sb.AppendLine();
         }
 
         foreach (var mod in SelectedConflict.ModVersions)
         {
             sb.AppendLine($"--- MOD: {mod.DzipSource} ---");
-            sb.AppendLine(Encoding.GetEncoding(1250).GetString(mod.Content));
+            sb.AppendLine(Encoding.ANSI1250.GetString(mod.Content));
             sb.AppendLine();
         }
 
         if (SelectedConflict.MergeContent is not null)
         {
             sb.AppendLine("--- MERGED RESULT ---");
-            sb.AppendLine(Encoding.GetEncoding(1250).GetString(SelectedConflict.MergeContent));
+            sb.AppendLine(Encoding.ANSI1250.GetString(SelectedConflict.MergeContent));
         }
 
         DiffViewText = sb.ToString();

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using DiffPlex;
+using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
@@ -64,6 +65,11 @@ public class MergeService(GameFileService gameFileService)
             }
         }
 
+        AttemptIncrementalMerge(conflict, scriptConflictsToResolve);
+    }
+
+    private void AttemptIncrementalMerge(ModConflict conflict, List<ScriptConflict> scriptConflictsToResolve)
+    {
         byte[] currentMerge = [];
         // Group conflicts by script path to handle multiple mods modifying the same script
         var groupedConflicts = scriptConflictsToResolve.GroupBy(sc => sc.RelativeScriptPath).ToList();
@@ -78,7 +84,7 @@ public class MergeService(GameFileService gameFileService)
             foreach (var sc in conflictsForScript)
             {
                 // Attempt to merge the current merge with this mod's changes
-                var merged = AttemptAutoMerge(currentMerge, sc.ConflictScriptContent);
+                var merged = AttemptMerge(currentMerge, sc.ConflictScriptContent);
                 if (merged is null)
                 {
                     // If merge failed due to auto unresolvable conflicts, flag the conflict as needing manual resolution and stop merge
@@ -109,10 +115,10 @@ public class MergeService(GameFileService gameFileService)
         conflict.MergeContent = currentMerge;
     }
 
-    private byte[]? AttemptAutoMerge(byte[] baseScriptContent, byte[] conflictScriptContent)
+    private byte[]? AttemptMerge(byte[] baseScriptContent, byte[] conflictScriptContent)
     {
-        var baseText = Encoding.GetEncoding(1250).GetString(baseScriptContent);
-        var modText = Encoding.GetEncoding(1250).GetString(conflictScriptContent);
+        var baseText = Encoding.ANSI1250.GetString(baseScriptContent);
+        var modText = Encoding.ANSI1250.GetString(conflictScriptContent);
 
         // Try three-way merge
         var currentMerged = baseText;
@@ -123,7 +129,7 @@ public class MergeService(GameFileService gameFileService)
 
         currentMerged = mergeResult.MergedText;
 
-        return Encoding.GetEncoding(1250).GetBytes(currentMerged);
+        return Encoding.ANSI1250.GetBytes(currentMerged);
     }
 
     private MergeResult ThreeWayMerge(string baseText, string leftText, string rightText)
