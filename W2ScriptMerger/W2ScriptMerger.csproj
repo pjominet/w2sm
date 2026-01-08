@@ -8,7 +8,7 @@
         <UseWPF>true</UseWPF>
         <Title>Witcher 2 Mod/Script Manager</Title>
         <Description>A mod manager and script merger for The Witcher 2</Description>
-        <!-- https://www.iconarchive.com/show/papirus-apps-icons-by-papirus-team/the-witcher-2-icon.html -->
+        <!-- Many thanks to https://www.iconarchive.com/show/papirus-apps-icons-by-papirus-team/the-witcher-2-icon.html -->
         <ApplicationIcon>Assets\w2sm.ico</ApplicationIcon>
     </PropertyGroup>
 

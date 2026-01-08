@@ -24,6 +24,7 @@ public partial class MainViewModel : ObservableObject
     private readonly LoggingService _loggingService;
 
     private static string ModsListPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "loadedMods.json");
+
     private readonly JsonSerializerOptions _jsonSerializerOptions = new()
     {
         WriteIndented = true
@@ -274,8 +275,10 @@ public partial class MainViewModel : ObservableObject
             Log($"Removed: {mod.ModName}");
 
             // Re-detect conflicts
-            await Task.Run(async () => { await Application.Current.Dispatcher.InvokeAsync(async () => await DetectConflictsAsync()); });
-
+            await Task.Run(async () =>
+            {
+                await Application.Current.Dispatcher.InvokeAsync(async () => await DetectConflictsAsync());
+            });
         }
         catch (Exception ex)
         {
