@@ -2,9 +2,9 @@
 
 namespace W2ScriptMerger.Tools;
 
-public static class DirectoryUtils
+internal static class DirectoryUtils
 {
-    public static void ClearDirectory(string directoryPath)
+    internal static void ClearDirectory(string directoryPath)
     {
         if (!Directory.Exists(directoryPath))
             return;

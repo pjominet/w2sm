@@ -11,7 +11,7 @@ internal static class Lzf
     /// <param name="input">Reference to the data to decompress</param>
     /// <param name="output">Reference to a buffer which will contain the decompressed data</param>
     /// <returns>The size of the decompressed archive in the output buffer</returns>
-    public static int Decompress(byte[] input, byte[] output)
+    internal static int Decompress(byte[] input, byte[] output)
     {
         var inputIndex = 0;
         var outputIndex = 0;
@@ -80,7 +80,7 @@ internal static class Lzf
     /// <param name="output">Reference to a buffer which will contain the compressed data</param>
     /// <param name="outputLength">Length of the compression buffer (should be bigger than the input buffer)</param>
     /// <returns>The size of the compressed archive in the output buffer</returns>
-    public static int Compress(byte[] input, int inputLength, byte[] output, int outputLength)
+    internal static int Compress(byte[] input, int inputLength, byte[] output, int outputLength)
     {
         const uint hlog = 14;
         const uint hsize = (1 << 14);
