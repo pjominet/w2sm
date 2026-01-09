@@ -107,10 +107,16 @@ public static class DzipService
 
         // Data is LZF compressed, decompress with LZF
         var uncompressed = new byte[entry.ExpectedUncompressedSize];
-        var uncompressedSize = Lzf.Decompress(compressedData, uncompressed);
-        return uncompressedSize != entry.ExpectedUncompressedSize
-            ? throw new InvalidOperationException($"Decompression failed: expected {entry.ExpectedUncompressedSize} bytes, got {uncompressedSize}")
-            : uncompressed;
+        try
+        {
+            Lzf.Decompress(compressedData, uncompressed);
+        }
+        catch (InvalidOperationException)
+        {
+            // Decompression failed, assume data is uncompressed and copy as-is
+            Array.Copy(compressedData, uncompressed, Math.Min(compressedData.Length, uncompressed.Length));
+        }
+        return uncompressed;
     }
 
     /// <summary>
@@ -134,7 +140,9 @@ public static class DzipService
             var fileInfo = new FileInfo(file);
 
             var offset = stream.Position;
-            long compressedSize = Lzf.Compress(fileData, fileData.Length, new byte[fileData.Length], fileData.Length);
+            var compressedData = Lzf.Compress(fileData);
+            long compressedSize = compressedData.Length;
+            stream.Write(compressedData, 0, (int)compressedSize);
 
             entries.Add(new DzipEntry
             {

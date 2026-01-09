@@ -25,7 +25,7 @@ public class MergeService(GameFileService gameFileService)
                 {
                     OriginalFile = gameFileService.GetDzipReference(file.Name).GetCurrentScriptPath()
                 };
-                conflict.ConflictingFiles.Add($"{modArchive.ModName}/{file.RelativePath}");
+                conflict.ConflictingFiles.Add($"modStaging/{modArchive.ModName}/{file.RelativePath}");
                 conflicts[file.Name] = conflict;
             }
         }
@@ -57,9 +57,9 @@ public class MergeService(GameFileService gameFileService)
                     scriptConflictsToResolve.Add(new ScriptConflict
                     {
                         DzipSource = Path.GetFileName(conflict.OriginalFile),
-                        RelativeScriptPath = relativeScriptPath,
-                        BaseScriptContent = File.ReadAllBytes(baseScript),
-                        ConflictScriptContent = File.ReadAllBytes(modScript)
+                        DzipScriptPath = relativeScriptPath,
+                        BaseScriptPath = baseScript,
+                        ConflictScriptPath = modScript
                     });
                 }
             }
@@ -72,7 +72,7 @@ public class MergeService(GameFileService gameFileService)
     {
         byte[] currentMerge = [];
         // Group conflicts by script path to handle multiple mods modifying the same script
-        var groupedConflicts = scriptConflictsToResolve.GroupBy(sc => sc.RelativeScriptPath).ToList();
+        var groupedConflicts = scriptConflictsToResolve.GroupBy(sc => sc.DzipScriptPath).ToList();
         if (groupedConflicts.Count == 0) // sanity check: no conflicts to resolve
             return;
 
@@ -80,11 +80,11 @@ public class MergeService(GameFileService gameFileService)
         {
             // Process all mod conflicts for this script
             var conflictsForScript = group.ToList();
-            currentMerge = conflictsForScript[0].BaseScriptContent;
+            currentMerge = File.ReadAllBytes(conflictsForScript[0].BaseScriptPath);
             foreach (var sc in conflictsForScript)
             {
                 // Attempt to merge the current merge with this mod's changes
-                var merged = AttemptMerge(currentMerge, sc.ConflictScriptContent);
+                var merged = AttemptMerge(currentMerge, File.ReadAllBytes(sc.ConflictScriptPath));
                 if (merged is null)
                 {
                     // If merge failed due to auto unresolvable conflicts, flag the conflict as needing manual resolution and stop merge
@@ -100,13 +100,13 @@ public class MergeService(GameFileService gameFileService)
             if (group.Key != groupedConflicts[0].Key)
                 continue;
 
-            conflict.VanillaContent = conflictsForScript[0].BaseScriptContent;
+            conflict.VanillaContentPath = conflictsForScript[0].BaseScriptPath;
             foreach (var sc in conflictsForScript)
             {
                 conflict.ModVersions.Add(new ModVersion
                 {
                     DzipSource = sc.DzipSource,
-                    Content = sc.ConflictScriptContent
+                    ContentPath = sc.ConflictScriptPath
                 });
             }
         }
@@ -200,6 +200,56 @@ public class MergeService(GameFileService gameFileService)
         // Join the merged lines back into text
         var mergedText = string.Join('\n', mergedLines);
         return new MergeResult { HasConflicts = false, MergedText = mergedText };
+    }
+
+    public void PopulateConflictDiffData(ModConflict conflict)
+    {
+        // Unpack the base (vanilla) dzip to access its script files for comparison
+        var baseFilePath = DzipService.UnpackDzip(conflict.OriginalFile, $"vanilla_{conflict.OriginalFileName}");
+        var scriptConflictsToResolve = new List<ScriptConflict>();
+        var modCount = 1;
+
+        // Iterate through each conflicting mod file to unpack and collect script conflicts
+        foreach (var conflictingFile in conflict.ConflictingFiles)
+        {
+            // Unpack the mod dzip to access its script files
+            var modFilePath = DzipService.UnpackDzip(conflictingFile, $"mod{modCount++}_{Path.GetFileName(conflictingFile)}");
+            var modScripts = Directory.GetFiles(modFilePath, "*.ws", SearchOption.AllDirectories);
+            foreach (var modScript in modScripts)
+            {
+                // Calculate the relative path of the script within the dzip for matching with base scripts
+                var relativeScriptPath = Path.GetRelativePath(modFilePath, modScript);
+                var baseScript = Path.Combine(baseFilePath, relativeScriptPath);
+                if (File.Exists(baseScript)) // sanity check: only create a conflict for scripts that exist in the vanilla dzip
+                {
+                    // Store base and mod content for diff viewing
+                    scriptConflictsToResolve.Add(new ScriptConflict
+                    {
+                        DzipSource = Path.GetFileName(conflict.OriginalFile),
+                        DzipScriptPath = relativeScriptPath,
+                        BaseScriptPath = baseScript,  // Store path instead of bytes
+                        ConflictScriptPath = modScript  // Store path instead of bytes
+                    });
+                }
+            }
+        }
+
+        // Group conflicts by script path to handle multiple mods modifying the same script
+        var groupedConflicts = scriptConflictsToResolve.GroupBy(sc => sc.DzipScriptPath).ToList();
+        if (groupedConflicts.Count == 0) // sanity check: no conflicts to resolve
+            return;
+
+        // Populate diff viewer content from the first script group only
+        var firstGroup = groupedConflicts[0];
+        conflict.VanillaContentPath = firstGroup.First().BaseScriptPath;
+        foreach (var sc in firstGroup)
+        {
+            conflict.ModVersions.Add(new ModVersion
+            {
+                DzipSource = sc.DzipSource,
+                ContentPath = sc.ConflictScriptPath
+            });
+        }
     }
 
     private static HashSet<int> GetChangedLineNumbers(DiffPlex.Model.DiffResult diff)

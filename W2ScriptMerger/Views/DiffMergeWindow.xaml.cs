@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -7,6 +8,7 @@ using DiffPlex;
 using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
 using W2ScriptMerger.Models;
+using W2ScriptMerger.Extensions;
 
 namespace W2ScriptMerger.Views;
 
@@ -25,24 +27,24 @@ public partial class DiffMergeWindow
         InitializeComponent();
         _conflict = conflict;
 
-        /*FileNameText.Text = conflict.FileName;
+        FileNameText.Text = conflict.OriginalFileName;
         FilePathText.Text = conflict.RelativePath;
 
         // Populate mod version selector
         foreach (var mod in conflict.ModVersions)
-            ModVersionSelector.Items.Add(mod.SourceArchive);
+            ModVersionSelector.Items.Add(mod.DzipSource);
 
         if (ModVersionSelector.Items.Count > 0)
             ModVersionSelector.SelectedIndex = 0;
 
         // Set initial merge result
-        if (conflict.MergedContent is not null)
-            MergeResultEditor.Text = Encoding.UTF8.GetString(conflict.MergedContent);
+        if (conflict.MergeContent is not null)
+            MergeResultEditor.Text = Encoding.UTF8.GetString(conflict.MergeContent);
         else if (conflict.ModVersions.Count > 0)
-            MergeResultEditor.Text = Encoding.UTF8.GetString(conflict.ModVersions[0].Content);
+            MergeResultEditor.Text = Encoding.UTF8.GetString(File.ReadAllBytes(conflict.ModVersions[0].ContentPath));
 
         // Show vanilla if available
-        if (conflict.VanillaContent is not null)
+        if (conflict.VanillaContentPath is not null)
         {
             LeftPanelTitle.Text = "Vanilla Version";
             UseVanillaButton.Visibility = Visibility.Visible;
@@ -54,17 +56,17 @@ public partial class DiffMergeWindow
         }
 
         LoadDiffView();
-        UpdateStatus();*/
+        UpdateStatus();
     }
 
     private void LoadDiffView()
     {
-        /*var vanillaText = _conflict.VanillaContent is not null
-            ? Encoding.UTF8.GetString(_conflict.VanillaContent)
+        var vanillaText = _conflict.VanillaContentPath is not null
+            ? Encoding.UTF8.GetString(File.ReadAllBytes(_conflict.VanillaContentPath))
             : string.Empty;
 
         var modText = _selectedModIndex < _conflict.ModVersions.Count
-            ? Encoding.UTF8.GetString(_conflict.ModVersions[_selectedModIndex].Content)
+            ? Encoding.UTF8.GetString(File.ReadAllBytes(_conflict.ModVersions[_selectedModIndex].ContentPath))
             : string.Empty;
 
         // Build diff
@@ -74,7 +76,7 @@ public partial class DiffMergeWindow
         DisplayDiffInRichTextBox(LeftDiffView, vanillaText, modText, isLeft: true);
 
         // Right panel - mod with diff highlighting
-        DisplayDiffInRichTextBox(RightDiffView, vanillaText, modText, isLeft: false);*/
+        DisplayDiffInRichTextBox(RightDiffView, vanillaText, modText, isLeft: false);
     }
 
     private void DisplayDiffInRichTextBox(RichTextBox rtb, string leftText, string rightText, bool isLeft)
@@ -178,20 +180,20 @@ public partial class DiffMergeWindow
 
     private void UseVanilla_Click(object sender, RoutedEventArgs e)
     {
-        /*if (_conflict.VanillaContent is null)
+        if (_conflict.VanillaContentPath is null)
             return;
 
-        MergeResultEditor.Text = Encoding.UTF8.GetString(_conflict.VanillaContent);
-        UpdateStatus();*/
+        MergeResultEditor.Text = Encoding.ANSI1250.GetString(File.ReadAllBytes(_conflict.VanillaContentPath));
+        UpdateStatus();
     }
 
     private void UseMod_Click(object sender, RoutedEventArgs e)
     {
-        /*if (_selectedModIndex < 0 || _selectedModIndex >= _conflict.ModVersions.Count)
+        if (_selectedModIndex < 0 || _selectedModIndex >= _conflict.ModVersions.Count)
             return;
 
-        MergeResultEditor.Text = Encoding.UTF8.GetString(_conflict.ModVersions[_selectedModIndex].Content);
-        UpdateStatus();*/
+        MergeResultEditor.Text = Encoding.ANSI1250.GetString(File.ReadAllBytes(_conflict.ModVersions[_selectedModIndex].ContentPath));
+        UpdateStatus();
     }
 
     private void CopyFromVanilla_Click(object sender, RoutedEventArgs e) => UseVanilla_Click(sender, e);
@@ -215,16 +217,16 @@ public partial class DiffMergeWindow
 
     private void UpdateStatus()
     {
-        /*var vanillaLines = _conflict.VanillaContent is not null
-            ? Encoding.UTF8.GetString(_conflict.VanillaContent).Split('\n').Length
+        var vanillaLines = _conflict.VanillaContentPath is not null
+            ? Encoding.UTF8.GetString(File.ReadAllBytes(_conflict.VanillaContentPath)).Split('\n').Length
             : 0;
 
         var modLines = _selectedModIndex >= 0 && _selectedModIndex < _conflict.ModVersions.Count
-            ? Encoding.UTF8.GetString(_conflict.ModVersions[_selectedModIndex].Content).Split('\n').Length
+            ? Encoding.UTF8.GetString(File.ReadAllBytes(_conflict.ModVersions[_selectedModIndex].ContentPath)).Split('\n').Length
             : 0;
 
         var mergeLines = MergeResultEditor.Text.Split('\n').Length;
 
-        StatusText.Text = $"Vanilla: {vanillaLines} lines | Mod: {modLines} lines | Merge result: {mergeLines} lines";*/
+        StatusText.Text = $"Vanilla: {vanillaLines} lines | Mod: {modLines} lines | Merge result: {mergeLines} lines";
     }
 }

@@ -349,21 +349,24 @@ public partial class MainViewModel : ObservableObject
         if (SelectedConflict is null)
             return;
 
+        if (SelectedConflict.VanillaContentPath is null)
+            _mergeService.PopulateConflictDiffData(SelectedConflict);
+
         var sb = new StringBuilder();
         sb.AppendLine($"=== Conflict: {SelectedConflict.RelativePath} ===");
         sb.AppendLine();
 
-        if (SelectedConflict.VanillaContent is not null)
+        if (SelectedConflict.VanillaContentPath is not null)
         {
             sb.AppendLine("--- VANILLA VERSION ---");
-            sb.AppendLine(Encoding.ANSI1250.GetString(SelectedConflict.VanillaContent));
+            sb.AppendLine(Encoding.ANSI1250.GetString(File.ReadAllBytes(SelectedConflict.VanillaContentPath)));
             sb.AppendLine();
         }
 
         foreach (var mod in SelectedConflict.ModVersions)
         {
             sb.AppendLine($"--- MOD: {mod.DzipSource} ---");
-            sb.AppendLine(Encoding.ANSI1250.GetString(mod.Content));
+            sb.AppendLine(Encoding.ANSI1250.GetString(File.ReadAllBytes(mod.ContentPath)));
             sb.AppendLine();
         }
 
@@ -381,6 +384,9 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedConflict is null)
             return;
+
+        if (SelectedConflict.VanillaContentPath is null)
+            _mergeService.PopulateConflictDiffData(SelectedConflict);
 
         var mergeWindow = new DiffMergeWindow(SelectedConflict)
         {

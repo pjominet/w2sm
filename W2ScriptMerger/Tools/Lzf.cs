@@ -1,4 +1,4 @@
-﻿namespace W2ScriptMerger.Tools;
+namespace W2ScriptMerger.Tools;
 
 /// <summary>
 /// LZF Compressor based on the work of Gibbet (https://github.com/gibbed/Gibbed.RED).
@@ -13,195 +13,213 @@ internal static class Lzf
     /// <returns>The size of the decompressed archive in the output buffer</returns>
     internal static int Decompress(byte[] input, byte[] output)
     {
-        var inputIndex = 0;
-        var outputIndex = 0;
+        var inputPosition = 0;
+        var outputPosition = 0;
 
         var inputLength = input.Length;
         var outputLength = output.Length;
 
-        while (inputIndex < inputLength)
+        while (inputPosition < inputLength)
         {
-            uint control = input[inputIndex++];
+            uint controlByte = input[inputPosition++];
 
-            if (control < (1 << 5))
+            if (controlByte < (1 << 5))
             {
-                var length = (int)(control + 1);
+                var copyLength = (int)(controlByte + 1);
 
-                if (outputIndex + length > outputLength)
+                if (outputPosition + copyLength > outputLength)
                 {
                     throw new InvalidOperationException();
                 }
 
-                Array.Copy(input, inputIndex, output, outputIndex, length);
-                inputIndex += length;
-                outputIndex += length;
+                Array.Copy(input, inputPosition, output, outputPosition, copyLength);
+                inputPosition += copyLength;
+                outputPosition += copyLength;
             }
             else
             {
-                var length = (int)(control >> 5);
-                var offset = (int)((control & 0x1F) << 8);
+                var matchLength = (int)(controlByte >> 5);
+                var backOffset = (int)((controlByte & 0x1F) << 8);
 
-                if (length == 7)
-                    length += input[inputIndex++];
+                if (matchLength == 7)
+                    matchLength += input[inputPosition++];
 
-                length += 2;
+                matchLength += 2;
 
-                offset |= input[inputIndex++];
+                backOffset |= input[inputPosition++];
 
-                if (outputIndex + length > outputLength)
+                if (outputPosition + matchLength > outputLength)
                     throw new InvalidOperationException();
 
-                offset = outputIndex - 1 - offset;
-                if (offset < 0)
+                backOffset = outputPosition - 1 - backOffset;
+                if (backOffset < 0)
                     throw new InvalidOperationException();
 
-                var block = Math.Min(length, outputIndex - offset);
-                Array.Copy(output, offset, output, outputIndex, block);
-                outputIndex += block;
-                offset += block;
-                length -= block;
+                var blockSize = Math.Min(matchLength, outputPosition - backOffset);
+                Array.Copy(output, backOffset, output, outputPosition, blockSize);
+                outputPosition += blockSize;
+                backOffset += blockSize;
+                matchLength -= blockSize;
 
-                while (length > 0)
+                while (matchLength > 0)
                 {
-                    output[outputIndex++] = output[offset++];
-                    length--;
+                    output[outputPosition++] = output[backOffset++];
+                    matchLength--;
                 }
             }
         }
 
-        return outputIndex;
+        return outputPosition;
     }
 
     /// <summary>
     /// Compresses data using LibLZF algorithm
     /// </summary>
     /// <param name="input">Reference to the data to compress</param>
+    /// <returns>The compressed data as a byte array</returns>
+    internal static byte[] Compress(byte[] input)
+    {
+        var inputLength = input.Length;
+        // Allocate buffer with extra space for incompressible data
+        var outputLength = inputLength + 64;
+        var output = new byte[outputLength];
+
+        var compressedSize = CompressInternal(input, inputLength, output, outputLength);
+        return compressedSize == 0 ?
+            // Compression failed, return uncompressed data
+            input :
+            // Return only the compressed portion
+            output.Take(compressedSize).ToArray();
+    }
+
+    /// <summary>
+    /// Compresses data using LibLZF algorithm (internal implementation)
+    /// </summary>
+    /// <param name="input">Reference to the data to compress</param>
     /// <param name="inputLength">Length of the data to compress</param>
     /// <param name="output">Reference to a buffer which will contain the compressed data</param>
-    /// <param name="outputLength">Length of the compression buffer (should be bigger than the input buffer)</param>
+    /// <param name="outputLength">Length of the compression buffer</param>
     /// <returns>The size of the compressed archive in the output buffer</returns>
-    internal static int Compress(byte[] input, int inputLength, byte[] output, int outputLength)
+    private static int CompressInternal(byte[] input, int inputLength, byte[] output, int outputLength)
     {
-        const uint hlog = 14;
-        const uint hsize = (1 << 14);
-        const uint maxLit = (1 << 5);
-        const uint maxOff = (1 << 13);
-        const uint maxRef = ((1 << 8) + (1 << 3));
+        const uint hashLog = 14;
+        const uint hashSize = 1 << 14;
+        const uint maxLiteral = 1 << 5;
+        const uint maxOffset = 1 << 13;
+        const uint maxReference = (1 << 8) + (1 << 3);
 
-        var hashTable = new long[hsize];
+        var hashTable = new long[hashSize];
 
-        Array.Clear(hashTable, 0, (int)hsize);
+        Array.Clear(hashTable, 0, (int)hashSize);
 
-        uint inputIndex = 0;
-        uint outputIndex = 0;
+        uint inputPosition = 0;
+        uint outputPosition = 0;
 
-        var hval = (uint)(((input[inputIndex]) << 8) | input[inputIndex + 1]);
-        var lit = 0;
+        // ReSharper disable once UselessBinaryOperation
+        var hashValue = (uint)((input[inputPosition] << 8) | input[inputPosition + 1]);
+        var literalCount = 0;
 
-        for (;;)
+        while (true)
         {
-            if (inputIndex < inputLength - 2)
+            if (inputPosition < inputLength - 2)
             {
-                hval = (hval << 8) | input[inputIndex + 2];
-                long hslot = ((hval ^ (hval << 5)) >> (int)(((3 * 8 - hlog)) - hval * 5) & (hsize - 1));
-                var reference = hashTable[hslot];
-                hashTable[hslot] = inputIndex;
+                hashValue = (hashValue << 8) | input[inputPosition + 2];
+                long hashSlot = (hashValue ^ (hashValue << 5)) >> (int)((3 * 8 - hashLog) - hashValue * 5) & (hashSize - 1);
+                var reference = hashTable[hashSlot];
+                hashTable[hashSlot] = inputPosition;
 
 
-                long off;
-                if ((off = inputIndex - reference - 1) < maxOff
-                    && inputIndex + 4 < inputLength
+                long backOffset;
+                if ((backOffset = inputPosition - reference - 1) < maxOffset
+                    && inputPosition + 4 < inputLength
                     && reference > 0
-                    && input[reference + 0] == input[inputIndex + 0]
-                    && input[reference + 1] == input[inputIndex + 1]
-                    && input[reference + 2] == input[inputIndex + 2]
-                   )
+                    && input[reference + 0] == input[inputPosition + 0]
+                    && input[reference + 1] == input[inputPosition + 1]
+                    && input[reference + 2] == input[inputPosition + 2])
                 {
                     /* match found at *reference++ */
-                    uint length = 2;
-                    var maxLength = (uint)inputLength - inputIndex - length;
-                    maxLength = maxLength > maxRef ? maxRef : maxLength;
+                    uint matchLength = 2;
+                    var maxMatchLength = (uint)inputLength - inputPosition - matchLength;
+                    maxMatchLength = maxMatchLength > maxReference ? maxReference : maxMatchLength;
 
-                    if (outputIndex + lit + 1 + 3 >= outputLength)
+                    if (outputPosition + literalCount + 1 + 3 >= outputLength)
                         return 0;
 
                     do
                     {
-                        length++;
-                    } while (length < maxLength && input[reference + length] == input[inputIndex + length]);
+                        matchLength++;
+                    } while (matchLength < maxMatchLength && input[reference + matchLength] == input[inputPosition + matchLength]);
 
-                    if (lit != 0)
+                    if (literalCount != 0)
                     {
-                        output[outputIndex++] = (byte)(lit - 1);
-                        lit = -lit;
+                        output[outputPosition++] = (byte)(literalCount - 1);
+                        literalCount = -literalCount;
                         do
                         {
-                            output[outputIndex++] = input[inputIndex + lit];
-                        } while ((++lit) != 0);
+                            output[outputPosition++] = input[inputPosition + literalCount];
+                        } while (++literalCount != 0);
                     }
 
-                    length -= 2;
-                    inputIndex++;
+                    matchLength -= 2;
+                    inputPosition++;
 
-                    if (length < 7)
-                        output[outputIndex++] = (byte)((off >> 8) + (length << 5));
+                    if (matchLength < 7)
+                        output[outputPosition++] = (byte)((backOffset >> 8) + (matchLength << 5));
                     else
                     {
-                        output[outputIndex++] = (byte)((off >> 8) + (7 << 5));
-                        output[outputIndex++] = (byte)(length - 7);
+                        output[outputPosition++] = (byte)((backOffset >> 8) + (7 << 5));
+                        output[outputPosition++] = (byte)(matchLength - 7);
                     }
 
-                    output[outputIndex++] = (byte)off;
+                    output[outputPosition++] = (byte)backOffset;
 
-                    inputIndex += length - 1;
-                    hval = (uint)(((input[inputIndex]) << 8) | input[inputIndex + 1]);
+                    inputPosition += matchLength - 1;
+                    hashValue = (uint)((input[inputPosition] << 8) | input[inputPosition + 1]);
 
-                    hval = (hval << 8) | input[inputIndex + 2];
-                    hashTable[((hval ^ (hval << 5)) >> (int)(((3 * 8 - hlog)) - hval * 5) & (hsize - 1))] = inputIndex;
-                    inputIndex++;
+                    hashValue = (hashValue << 8) | input[inputPosition + 2];
+                    hashTable[(hashValue ^ (hashValue << 5)) >> (int)((3 * 8 - hashLog) - hashValue * 5) & (hashSize - 1)] = inputPosition;
+                    inputPosition++;
 
-                    hval = (hval << 8) | input[inputIndex + 2];
-                    hashTable[((hval ^ (hval << 5)) >> (int)(((3 * 8 - hlog)) - hval * 5) & (hsize - 1))] = inputIndex;
-                    inputIndex++;
+                    hashValue = (hashValue << 8) | input[inputPosition + 2];
+                    hashTable[(hashValue ^ (hashValue << 5)) >> (int)((3 * 8 - hashLog) - hashValue * 5) & (hashSize - 1)] = inputPosition;
+                    inputPosition++;
                     continue;
                 }
             }
-            else if (inputIndex == inputLength)
-            {
+            else if (inputPosition == inputLength)
                 break;
-            }
 
             /* one more literal byte we must copy */
-            lit++;
-            inputIndex++;
+            literalCount++;
+            inputPosition++;
 
-            if (lit != maxLit)
+            if (literalCount != maxLiteral)
                 continue;
 
-            if (outputIndex + 1 + maxLit >= outputLength)
+            if (outputPosition + 1 + maxLiteral >= outputLength)
                 return 0;
 
-            output[outputIndex++] = (byte)(maxLit - 1);
-            lit = -lit;
+            output[outputPosition++] = (byte)(maxLiteral - 1);
+            literalCount = -literalCount;
             do
             {
-                output[outputIndex++] = input[inputIndex + lit];
-            } while ((++lit) != 0);
+                output[outputPosition++] = input[inputPosition + literalCount];
+            } while (++literalCount != 0);
         }
 
-        if (lit == 0)
-            return (int)outputIndex;
+        if (literalCount == 0)
+            return (int)outputPosition;
 
-        if (outputIndex + lit + 1 >= outputLength)
+        if (outputPosition + literalCount + 1 >= outputLength)
             return 0;
 
-        output[outputIndex++] = (byte)(lit - 1);
-        lit = -lit;
+        output[outputPosition++] = (byte)(literalCount - 1);
+        literalCount = -literalCount;
         do
         {
-            output[outputIndex++] = input[inputIndex + lit];
-        } while ((++lit) != 0);
+            output[outputPosition++] = input[inputPosition + literalCount];
+        } while (++literalCount != 0);
 
-        return (int)outputIndex;
+        return (int)outputPosition;
     }
 }
