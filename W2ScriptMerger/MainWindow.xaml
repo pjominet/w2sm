@@ -76,8 +76,8 @@
                         <Button Content="+ Add Mods" Command="{Binding AddModsCommand}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
                         <Button Content="Clear All" Command="{Binding ClearModsCommand}" Style="{StaticResource DarkButton}"/>
                     </StackPanel>
-                    <TextBox Text="{Binding ModSearchFilter, UpdateSourceTrigger=PropertyChanged}" 
-                             Style="{StaticResource DarkTextBox}" 
+                    <TextBox Text="{Binding ModSearchFilter, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource DarkTextBox}"
                              Tag="🔍 Search mods..."/>
                 </StackPanel>
 
@@ -214,6 +214,8 @@
                 <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10">
                     <Button x:Name="DebugMergeEditorButton" Content="✏ Debug Merge Editor" Command="{Binding OpenDebugMergeEditorCommand}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
                     <Button x:Name="ViewDiffButton" Content="👁 View Diff" Command="{Binding ViewDiffCommand}" Style="{StaticResource DarkButton}" Visibility="Collapsed"/>
+                    <Button Content="📋 View Merge Summary" Command="{Binding ViewMergeSummaryCommand}" Style="{StaticResource DarkButton}"
+                            Visibility="{Binding HasExistingMerge, Converter={StaticResource BoolToVis}}" Margin="0,0,8,0"/>
                 </StackPanel>
 
                 <!-- Diff Preview -->

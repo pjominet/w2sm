@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Text;
 using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -42,17 +41,19 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _diffViewText = string.Empty;
     [ObservableProperty] private string _logText = string.Empty;
     [ObservableProperty] private bool _hasPendingMergeChanges;
+    [ObservableProperty] private bool _hasExistingMerge;
     [ObservableProperty] private string _modSearchFilter = string.Empty;
 
-    public ObservableCollection<ModArchive> LoadedMods { get; } = [];
+    private ObservableCollection<ModArchive> LoadedMods { get; } = [];
     public ObservableCollection<DzipConflict> DzipConflicts { get; } = [];
-    
+
     public IEnumerable<ModArchive> FilteredMods => string.IsNullOrWhiteSpace(ModSearchFilter)
         ? LoadedMods.OrderBy(m => m.DisplayName)
         : LoadedMods.Where(m => m.DisplayName.Contains(ModSearchFilter, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(m => m.DisplayName);
 
     partial void OnModSearchFilterChanged(string value) => OnPropertyChanged(nameof(FilteredMods));
+
     private ObservableCollection<string> LogMessages { get; } = [];
 
     public MainViewModel()
@@ -83,7 +84,7 @@ public partial class MainViewModel : ObservableObject
         });
     }
 
-    #region Private Helpers
+    #region Helpers
 
     private void UpdateLogText() => LogText = string.Join(Environment.NewLine, LogMessages);
 
@@ -156,11 +157,75 @@ public partial class MainViewModel : ObservableObject
 
         var conflicts = await Task.Run(() => _conflictDetectionService.DetectConflicts(LoadedMods.ToList()));
 
+        // Load any existing merges from disk
+        _extractionService.LoadExistingMerges(conflicts);
+
         foreach (var conflict in conflicts)
             DzipConflicts.Add(conflict);
 
         var totalScripts = conflicts.Sum(c => c.ScriptConflicts.Count);
-        Log($"Detected {DzipConflicts.Count} dzip conflicts ({totalScripts} scripts)");
+        var mergedScripts = conflicts.Sum(c => c.ScriptConflicts.Count(s => s.Status is ConflictStatus.AutoResolved or ConflictStatus.ManuallyResolved));
+
+        HasExistingMerge = mergedScripts > 0;
+
+        Log(mergedScripts > 0
+            ? $"Detected {DzipConflicts.Count} dzip conflicts ({totalScripts} scripts, {mergedScripts} already merged)"
+            : $"Detected {DzipConflicts.Count} dzip conflicts ({totalScripts} scripts)");
+    }
+
+    private void OpenManualMergeEditor(DzipConflict dzipConflict, ScriptFileConflict scriptConflict)
+    {
+        var mergeWindow = new DiffMergeWindow(dzipConflict, scriptConflict, DzipConflicts.ToList())
+        {
+            Owner = Application.Current.MainWindow
+        };
+
+        if (mergeWindow.ShowDialog() != true)
+            return;
+
+        foreach (var resolved in mergeWindow.ResolvedConflicts)
+        {
+            _mergeService.ApplyManualMerge(resolved.Dzip, resolved.Script, resolved.MergedContent);
+            Log($"Manually merged: {resolved.Script.ScriptFileName}");
+        }
+
+        var allResolved = DzipConflicts.All(c => c.IsFullyMerged);
+        if (allResolved)
+        {
+            _extractionService.WriteMergeManifest(DzipConflicts.ToList());
+            HasPendingMergeChanges = false;
+            StatusMessage = "All conflicts resolved";
+            Log("All conflicts resolved");
+
+            var autoCount = DzipConflicts.Sum(c => c.ScriptConflicts.Count(s => s.Status == ConflictStatus.AutoResolved));
+            var manualCount = mergeWindow.ResolvedConflicts.Count;
+            ShowMergeSummary(autoCount, manualCount);
+        }
+        else
+        {
+            var remaining = DzipConflicts.Sum(c => c.ScriptConflicts.Count(s => s.Status is ConflictStatus.NeedsManualResolution));
+            StatusMessage = $"{remaining} scripts still need manual resolution";
+        }
+
+        RefreshConflictsList();
+    }
+
+    private void ShowMergeSummary(int autoMergedCount, int manualMergedCount)
+    {
+        var mergedModsPath = Path.Combine(_extractionService.MergedScriptsPath, "MERGE_SUMMARY.md");
+        var dialog = new MergeSummaryDialog(mergedModsPath, autoMergedCount, manualMergedCount)
+        {
+            Owner = Application.Current.MainWindow
+        };
+        dialog.ShowDialog();
+    }
+
+    private void RefreshConflictsList()
+    {
+        var conflicts = DzipConflicts.ToList();
+        DzipConflicts.Clear();
+        foreach (var c in conflicts)
+            DzipConflicts.Add(c);
     }
 
     #endregion
@@ -386,6 +451,7 @@ public partial class MainViewModel : ObservableObject
             HasPendingMergeChanges = false;
             StatusMessage = $"Merge complete - {mergeResult.AutoMergedCount} scripts merged";
             Log("All conflicts resolved automatically");
+            ShowMergeSummary(mergeResult.AutoMergedCount, 0);
         }
         else
         {
@@ -439,37 +505,12 @@ public partial class MainViewModel : ObservableObject
         diffWindow.ShowDialog();
     }
 
-    private void OpenManualMergeEditor(DzipConflict dzipConflict, ScriptFileConflict scriptConflict)
+    [RelayCommand]
+    private void ViewMergeSummary()
     {
-        var mergeWindow = new DiffMergeWindow(dzipConflict, scriptConflict, DzipConflicts.ToList())
-        {
-            Owner = Application.Current.MainWindow
-        };
-
-        if (mergeWindow.ShowDialog() != true)
-            return;
-
-        foreach (var resolved in mergeWindow.ResolvedConflicts)
-        {
-            _mergeService.ApplyManualMerge(resolved.Dzip, resolved.Script, resolved.MergedContent);
-            Log($"Manually merged: {resolved.Script.ScriptFileName}");
-        }
-
-        var allResolved = DzipConflicts.All(c => c.IsFullyMerged);
-        if (allResolved)
-        {
-            _extractionService.WriteMergeManifest(DzipConflicts.ToList());
-            HasPendingMergeChanges = false;
-            StatusMessage = "All conflicts resolved";
-            Log("All conflicts resolved");
-        }
-        else
-        {
-            var remaining = DzipConflicts.Sum(c => c.ScriptConflicts.Count(s => s.Status is ConflictStatus.NeedsManualResolution));
-            StatusMessage = $"{remaining} scripts still need manual resolution";
-        }
-
-        RefreshConflictsList();
+        var autoCount = DzipConflicts.Sum(c => c.ScriptConflicts.Count(s => s.Status == ConflictStatus.AutoResolved));
+        var manualCount = DzipConflicts.Sum(c => c.ScriptConflicts.Count(s => s.Status == ConflictStatus.ManuallyResolved));
+        ShowMergeSummary(autoCount, manualCount);
     }
 
     [RelayCommand]
@@ -583,14 +624,6 @@ public partial class MainViewModel : ObservableObject
         {
             IsBusy = false;
         }
-    }
-
-    private void RefreshConflictsList()
-    {
-        var conflicts = DzipConflicts.ToList();
-        DzipConflicts.Clear();
-        foreach (var c in conflicts)
-            DzipConflicts.Add(c);
     }
 
     #endregion
