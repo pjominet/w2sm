@@ -2,8 +2,8 @@ name: Build and Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - master
   workflow_dispatch:
 
 jobs:
@@ -25,7 +25,25 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
+    - name: Extract version
+      id: version
+      run: |
+        [xml]$csproj = Get-Content W2ScriptMerger/W2ScriptMerger.csproj
+        $version = $csproj.Project.PropertyGroup.Version
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+    - name: Check if tag exists
+      id: tag_check
+      run: |
+        $tagExists = git ls-remote --tags origin "refs/tags/v${{ steps.version.outputs.VERSION }}" | Measure-Object -Line | Select-Object -ExpandProperty Lines
+        if ($tagExists -gt 0) {
+          echo "TAG_EXISTS=true" >> $env:GITHUB_OUTPUT
+        } else {
+          echo "TAG_EXISTS=false" >> $env:GITHUB_OUTPUT
+        }
+
     - name: Publish
+      if: steps.tag_check.outputs.TAG_EXISTS == 'false'
       run: |
         dotnet publish W2ScriptMerger/W2ScriptMerger.csproj `
           --configuration Release `
@@ -38,12 +56,14 @@ jobs:
           --output ./publish
 
     - name: Zip release
-      run: Compress-Archive -Path ./publish/* -DestinationPath ./w2sm-${{ github.ref_name }}-win-x64.zip
+      if: steps.tag_check.outputs.TAG_EXISTS == 'false'
+      run: Compress-Archive -Path ./publish/* -DestinationPath ./w2sm-v${{ steps.version.outputs.VERSION }}-win-x64.zip
 
     - name: Create Release
+      if: steps.tag_check.outputs.TAG_EXISTS == 'false'
       uses: softprops/action-gh-release@v2
       with:
-        files: ./w2sm-${{ github.ref_name }}-win-x64.zip
-        generate_release_notes: true
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        files: ./w2sm-v${{ steps.version.outputs.VERSION }}-win-x64.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
