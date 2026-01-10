@@ -53,6 +53,9 @@ public partial class MainViewModel : ObservableObject
         : LoadedMods.Where(m => m.DisplayName.Contains(ModSearchFilter, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(m => m.DisplayName);
 
+    public bool HasUnresolvedConflicts => DzipConflicts.Any(c => c.ScriptConflicts.Any(s => 
+        s.Status is ConflictStatus.Unresolved or ConflictStatus.NeedsManualResolution));
+
     partial void OnModSearchFilterChanged(string value) => OnPropertyChanged(nameof(FilteredMods));
 
     partial void OnPromptForUnknownInstallLocationChanged(bool value) => _configService.PromptForUnknownInstallLocation = value;
@@ -172,6 +175,7 @@ public partial class MainViewModel : ObservableObject
         var mergedScripts = conflicts.Sum(c => c.ScriptConflicts.Count(s => s.Status is ConflictStatus.AutoResolved or ConflictStatus.ManuallyResolved));
 
         HasExistingMerge = mergedScripts > 0;
+        OnPropertyChanged(nameof(HasUnresolvedConflicts));
 
         Log(mergedScripts > 0
             ? $"Detected {DzipConflicts.Count} dzip conflicts ({totalScripts} scripts, {mergedScripts} already merged)"
@@ -231,6 +235,7 @@ public partial class MainViewModel : ObservableObject
         DzipConflicts.Clear();
         foreach (var c in conflicts)
             DzipConflicts.Add(c);
+        OnPropertyChanged(nameof(HasUnresolvedConflicts));
     }
 
     #endregion
