@@ -9,17 +9,18 @@ public class ConfigService
 {
     private readonly string _configPath;
     private readonly string _modStagingPath;
-    private readonly JsonSerializerOptions _jsonSerializerOptions;
     private AppConfig Config { get; }
 
     public ConfigService(JsonSerializerOptions options)
     {
-        _jsonSerializerOptions = options;
+        JsonSerializerOptions = options;
         var exeLocation = AppDomain.CurrentDomain.BaseDirectory;
         _configPath = Path.Combine(exeLocation, "config.json");
         _modStagingPath = Path.Combine(exeLocation, "modStaging");
         Config = Load();
     }
+
+    public JsonSerializerOptions JsonSerializerOptions { get; }
 
     public string? GamePath
     {
@@ -102,7 +103,7 @@ public class ConfigService
     {
         try
         {
-            var json = JsonSerializer.Serialize(Config, _jsonSerializerOptions);
+            var json = JsonSerializer.Serialize(Config, JsonSerializerOptions);
             File.WriteAllText(_configPath, json);
         }
         catch

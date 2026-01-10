@@ -134,33 +134,47 @@ public class ScriptExtractionService(ConfigService configService)
         File.WriteAllBytes(scriptPath, scriptConflict.MergedContent);
     }
 
+    public void LoadExistingMerges(List<DzipConflict> conflicts)
+    {
+        if (!Directory.Exists(MergedScriptsPath))
+            return;
+
+        foreach (var conflict in conflicts)
+        {
+            var dzipFolder = Path.Combine(MergedScriptsPath, conflict.DzipName);
+            if (!Directory.Exists(dzipFolder))
+                continue;
+
+            foreach (var script in conflict.ScriptConflicts)
+            {
+                var mergedPath = Path.Combine(dzipFolder, script.ScriptRelativePath);
+                if (!File.Exists(mergedPath))
+                    continue;
+
+                script.MergedContent = File.ReadAllBytes(mergedPath);
+                script.Status = ConflictStatus.AutoResolved;
+            }
+        }
+    }
+
     public void PackMergedDzip(string dzipName)
     {
         var sourceDir = Path.Combine(MergedScriptsPath, dzipName);
         if (!Directory.Exists(sourceDir))
             return;
 
-        var outputPath = Path.Combine(MergedScriptsPath, dzipName);
+        var outputPath = Path.Combine(MergedScriptsPath, dzipName + ".dzip.tmp");
+        var finalPath = Path.Combine(MergedScriptsPath, dzipName);
+
         if (File.Exists(outputPath))
             File.Delete(outputPath);
 
-        var tempDir = sourceDir + "_temp";
-        if (Directory.Exists(tempDir))
-            Directory.Delete(tempDir, true);
+        DzipService.PackDzip(outputPath, sourceDir);
 
-        Directory.Move(sourceDir, tempDir);
+        if (File.Exists(finalPath))
+            File.Delete(finalPath);
 
-        try
-        {
-            DzipService.PackDzip(outputPath, tempDir);
-        }
-        finally
-        {
-            if (Directory.Exists(tempDir))
-            {
-                Directory.Move(tempDir, sourceDir);
-            }
-        }
+        File.Move(outputPath, finalPath);
     }
 
     public void CleanupExtractedFiles()

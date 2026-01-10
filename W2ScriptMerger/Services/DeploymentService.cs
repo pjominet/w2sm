@@ -1,11 +1,20 @@
 using System.IO;
+using System.Text.Json;
 using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
 internal class DeploymentService(ConfigService configService, ScriptExtractionService extractionService)
 {
-    private const string BackupExtension = ".bak";
+    private const string BackupExtension = ".smbk";
+    private const string ManifestFileName = "w2scriptmerger_deployment.json";
+
+    private class DeploymentManifest
+    {
+        public DateTime DeployedAt { get; set; }
+        public List<string> BackedUpFiles { get; init; } = [];
+        public List<string> DeployedFiles { get; init; } = [];
+    }
 
     public void DeployMod(ModArchive mod, HashSet<string> mergedDzipNames)
     {
@@ -39,6 +48,8 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         if (string.IsNullOrEmpty(targetBasePath))
             throw new InvalidOperationException("Game path not set");
 
+        var manifest = LoadOrCreateManifest(targetBasePath);
+
         foreach (var conflict in conflicts.Where(c => c.IsFullyMerged))
         {
             extractionService.PackMergedDzip(conflict.DzipName);
@@ -49,10 +60,17 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
             var targetPath = Path.Combine(targetBasePath, conflict.DzipName);
 
-            BackupIfExists(targetPath);
+            if (BackupIfExists(targetPath))
+                manifest.BackedUpFiles.Add(conflict.DzipName);
 
             File.Copy(mergedDzipPath, targetPath, overwrite: true);
+
+            if (!manifest.DeployedFiles.Contains(conflict.DzipName))
+                manifest.DeployedFiles.Add(conflict.DzipName);
         }
+
+        manifest.DeployedAt = DateTime.Now;
+        SaveManifest(targetBasePath, manifest);
     }
 
     public void UndeployMod(ModArchive mod)
@@ -75,16 +93,35 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
     public void RestoreAllBackups()
     {
-        RestoreBackupsInDirectory(configService.GameCookedPCPath);
+        var cookedPcPath = configService.GameCookedPCPath;
+        if (!string.IsNullOrEmpty(cookedPcPath))
+        {
+            RestoreBackupsFromManifest(cookedPcPath);
+            RestoreBackupsInDirectory(cookedPcPath);
+        }
+
         RestoreBackupsInDirectory(configService.UserContentPath);
+    }
+
+    private static void RestoreBackupsFromManifest(string targetBasePath)
+    {
+        var manifest = LoadOrCreateManifest(targetBasePath);
+
+        foreach (var deployedFile in manifest.DeployedFiles)
+        {
+            var filePath = Path.Combine(targetBasePath, deployedFile);
+            RestoreBackup(filePath);
+        }
+
+        var manifestPath = Path.Combine(targetBasePath, ManifestFileName);
+        if (File.Exists(manifestPath))
+            File.Delete(manifestPath);
     }
 
     public void PurgeDeployedMods(IEnumerable<ModArchive> mods)
     {
         foreach (var mod in mods.Where(m => m.IsDeployed))
-        {
             UndeployMod(mod);
-        }
 
         RestoreAllBackups();
     }
@@ -112,17 +149,42 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         return normalized;
     }
 
-    private static void BackupIfExists(string filePath)
+    private static bool BackupIfExists(string filePath)
     {
         if (!File.Exists(filePath))
-            return;
+            return false;
 
         var backupPath = filePath + BackupExtension;
 
         if (File.Exists(backupPath))
-            return;
+            return false;
 
         File.Copy(filePath, backupPath, overwrite: false);
+        return true;
+    }
+
+    private static DeploymentManifest LoadOrCreateManifest(string targetBasePath)
+    {
+        var manifestPath = Path.Combine(targetBasePath, ManifestFileName);
+        if (!File.Exists(manifestPath))
+            return new DeploymentManifest();
+
+        try
+        {
+            var json = File.ReadAllText(manifestPath);
+            return JsonSerializer.Deserialize<DeploymentManifest>(json) ?? new DeploymentManifest();
+        }
+        catch
+        {
+            return new DeploymentManifest();
+        }
+    }
+
+    private void SaveManifest(string targetBasePath, DeploymentManifest manifest)
+    {
+        var manifestPath = Path.Combine(targetBasePath, ManifestFileName);
+        var json = JsonSerializer.Serialize(manifest, configService.JsonSerializerOptions);
+        File.WriteAllText(manifestPath, json);
     }
 
     private static void RestoreBackup(string filePath)
