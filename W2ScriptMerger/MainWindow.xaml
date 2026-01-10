@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:W2ScriptMerger.ViewModels"
         mc:Ignorable="d"
-        Title="Witcher 2 Mod Manager"
+        Title="{Binding WindowTitle}"
         Height="800" Width="1200"
         MinHeight="650" MinWidth="1000"
         WindowStartupLocation="CenterScreen"

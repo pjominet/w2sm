@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using W2ScriptMerger.Models;
@@ -20,6 +21,11 @@ public partial class MainViewModel : ObservableObject
     private readonly LoggingService _loggingService;
 
     private static string ModsListPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Constants.STAGING_LIST_FILENAME);
+
+    public static string AppVersion => Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0";
+
+    public string WindowTitle => $"Witcher 2 Mod Manager v{AppVersion}";
 
     private readonly JsonSerializerOptions _jsonSerializerOptions = new()
     {
