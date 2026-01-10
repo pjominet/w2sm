@@ -156,4 +156,32 @@ public partial class MainViewModel
             DzipConflicts.Add(c);
         OnPropertyChanged(nameof(HasUnresolvedConflicts));
     }
+
+    private List<ModArchive> GetModsInSameMerge(ModArchive mod)
+    {
+        var result = new HashSet<ModArchive> { mod };
+
+        // Find all merged conflicts that include this mod
+        var mergedConflictsWithMod = DzipConflicts
+            .Where(c => c.IsFullyMerged && c.ModSources.Any(s => s.ModName == mod.ModName))
+            .ToList();
+
+        if (mergedConflictsWithMod.Count == 0)
+            return result.ToList();
+
+        // Get all mod names from those conflicts
+        var allModNamesInMerge = mergedConflictsWithMod
+            .SelectMany(c => c.ModSources.Select(s => s.ModName))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Find the corresponding ModArchive objects
+        foreach (var loadedMod in LoadedMods)
+        {
+            if (allModNamesInMerge.Contains(loadedMod.ModName))
+                result.Add(loadedMod);
+        }
+
+        return result.ToList();
+    }
 }

@@ -8,6 +8,95 @@ namespace W2ScriptMerger.ViewModels;
 public partial class MainViewModel
 {
     [RelayCommand]
+    private async Task DeployMod(ModArchive? mod)
+    {
+        if (mod is null || mod.IsDeployed || !IsGamePathValid)
+            return;
+
+        try
+        {
+            IsBusy = true;
+
+            // Find all mods that share a merge with this mod
+            var modsToDeployTogether = GetModsInSameMerge(mod);
+
+            if (modsToDeployTogether.Count > 1)
+            {
+                var otherModNames = string.Join("\n• ", modsToDeployTogether.Where(m => m != mod).Select(m => m.DisplayName));
+                var result = MessageBox.Show(
+                    $"This mod is part of a merged script. Deploying will also deploy:\n\n- {otherModNames}\n\nContinue?",
+                    "Deploy Merged Mods",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result is not MessageBoxResult.Yes)
+                {
+                    IsBusy = false;
+                    return;
+                }
+            }
+
+            // Get merged dzip names for skipping during mod deployment
+            var mergedDzipNames = new HashSet<string>(
+                DzipConflicts.Where(c => c.IsFullyMerged).Select(c => c.DzipName),
+                StringComparer.OrdinalIgnoreCase);
+
+            // Check if any mod in the group is part of a merge - if so, deploy the merge
+            var modsInMerge = modsToDeployTogether.Where(m =>
+                DzipConflicts.Any(c => c.IsFullyMerged && c.ModSources.Any(s => s.ModName == m.ModName))).ToList();
+
+            if (modsInMerge.Count != 0)
+            {
+                await Task.Run(() => _deploymentService.DeployMergedDzips(DzipConflicts.ToList()));
+                Log("Deployed merged scripts");
+            }
+
+            // Deploy all mods in the group
+            foreach (var modToDeploy in modsToDeployTogether.Where(m => !m.IsDeployed))
+            {
+                if (modToDeploy.ModInstallLocation == InstallLocation.Unknown)
+                {
+                    if (PromptForUnknownInstallLocation)
+                    {
+                        var dialog = new InstallLocationDialog(modToDeploy.DisplayName)
+                        {
+                            Owner = Application.Current.MainWindow
+                        };
+
+                        if (dialog.ShowDialog() == true)
+                            modToDeploy.ModInstallLocation = dialog.SelectedLocation;
+                        else
+                        {
+                            Log($"Skipped: {modToDeploy.DisplayName}");
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        modToDeploy.ModInstallLocation = InstallLocation.CookedPC;
+                    }
+                }
+
+                await Task.Run(() => _deploymentService.DeployMod(modToDeploy, mergedDzipNames));
+                Log($"Deployed: {modToDeploy.DisplayName}");
+            }
+
+            await UpdateLoadedModsList();
+            OnPropertyChanged(nameof(FilteredMods));
+            StatusMessage = $"Deployed {modsToDeployTogether.Count(m => m.IsDeployed)} mod(s)";
+        }
+        catch (Exception ex)
+        {
+            Log($"Error deploying mod: {ex.Message}");
+            StatusMessage = "Deployment failed";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
     private async Task DeployMods()
     {
         if (!IsGamePathValid)
