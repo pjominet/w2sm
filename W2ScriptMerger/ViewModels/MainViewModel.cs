@@ -353,7 +353,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task RemoveMod(ModArchive? mod)
+    private async Task DeleteMod(ModArchive? mod)
     {
         if (mod is null)
             return;
@@ -362,7 +362,7 @@ public partial class MainViewModel : ObservableObject
         {
             if (mod.IsDeployed)
             {
-                _deploymentService.UndeployMod(mod);
+                _deploymentService.RemoveMod(mod);
                 Log($"Undeployed: {mod.DisplayName}");
             }
 
@@ -395,14 +395,14 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void RestoreMod(ModArchive? mod)
+    private void RemoveMod(ModArchive? mod)
     {
         if (mod is null || !mod.IsDeployed)
             return;
 
         try
         {
-            _deploymentService.UndeployMod(mod);
+            _deploymentService.RemoveMod(mod);
             Log($"Undeployed: {mod.DisplayName}");
             StatusMessage = $"Undeployed {mod.DisplayName}";
         }
@@ -413,7 +413,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task DeleteAllMods()
+    private async Task PurgeMods()
     {
         var result = MessageBox.Show(
             "This will remove all staged mods and restore vanilla game files. Continue?",
@@ -437,7 +437,7 @@ public partial class MainViewModel : ObservableObject
             LoadedMods.Clear();
             DzipConflicts.Clear();
             OnPropertyChanged(nameof(FilteredMods));
-            
+
             // Save empty mods list
             await UpdateLoadedModsList();
 

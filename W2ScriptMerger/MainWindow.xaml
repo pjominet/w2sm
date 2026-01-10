@@ -74,7 +74,7 @@
                     <TextBlock Text="Staged Mods" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,8"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <Button Content="➕ Add Mods" Command="{Binding AddModsCommand}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
-                        <Button Content="🗑️ Delete All" Command="{Binding DeleteAllModsCommand}" Style="{StaticResource DangerButton}"/>
+                        <Button Content="🗑️ Purge All Mods" Command="{Binding PurgeModsCommand}" Style="{StaticResource DangerButton}"/>
                     </StackPanel>
                     <TextBox Text="{Binding ModSearchFilter, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource DarkTextBox}"
@@ -121,13 +121,13 @@
                                             Command="{Binding DataContext.OpenModFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
                                             Style="{StaticResource IconButton}" Margin="4,0,0,0"/>
-                                    <Button Content="↩" ToolTip="Restore (to staged)"
-                                            Command="{Binding DataContext.RestoreModCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    <Button Content="↩" ToolTip="Remove mod from game"
+                                            Command="{Binding DataContext.RemoveModCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
                                             Style="{StaticResource IconButtonWarning}" Margin="4,0,0,0"
                                             Visibility="{Binding IsDeployed, Converter={StaticResource BoolToVis}}"/>
-                                    <Button Content="➖" ToolTip="Remove mod"
-                                            Command="{Binding DataContext.RemoveModCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    <Button Content="➖" ToolTip="Delete mod"
+                                            Command="{Binding DataContext.DeleteModCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
                                             Style="{StaticResource IconButtonDanger}" Margin="4,0,0,0"/>
                                 </StackPanel>

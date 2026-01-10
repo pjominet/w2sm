@@ -74,7 +74,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         SaveManifest(targetBasePath, manifest);
     }
 
-    public void UndeployMod(ModArchive mod)
+    public void RemoveMod(ModArchive mod)
     {
         if (!mod.IsDeployed)
             return;
@@ -139,7 +139,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
     public void PurgeDeployedMods(IEnumerable<ModArchive> mods)
     {
         foreach (var mod in mods.Where(m => m.IsDeployed))
-            UndeployMod(mod);
+            RemoveMod(mod);
 
         RestoreAllBackups();
     }
