@@ -36,7 +36,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
             if (File.Exists(sourcePath))
             {
                 File.Copy(sourcePath, targetPath, overwrite: true);
-                
+
                 if (!manifest.ManagedFiles.Contains(relativePath))
                     manifest.ManagedFiles.Add(relativePath);
             }
@@ -102,11 +102,11 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         }
 
         var userContentPath = configService.UserContentPath;
-        if (!string.IsNullOrEmpty(userContentPath) && Directory.Exists(userContentPath))
-        {
-            RestoreBackupsFromManifest(userContentPath);
-            RestoreBackupsInDirectory(userContentPath);
-        }
+        if (string.IsNullOrEmpty(userContentPath) || !Directory.Exists(userContentPath))
+            return;
+
+        RestoreBackupsFromManifest(userContentPath);
+        RestoreBackupsInDirectory(userContentPath);
     }
 
     private static void RestoreBackupsFromManifest(string targetBasePath)
@@ -118,31 +118,17 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
             var filePath = Path.Combine(targetBasePath, managedFile);
             var backupPath = filePath + Constants.BACKUP_FILE_EXTENSION;
 
-            if (File.Exists(backupPath))
-            {
-                // Restore from backup
-                if (File.Exists(filePath))
-                    File.Delete(filePath);
-                File.Move(backupPath, filePath);
-            }
-            else if (File.Exists(filePath))
-            {
-                // No backup means this was a new file - delete it
+            // If no backup exists, leave the file alone as it's either:
+            // 1. A vanilla file that was never backed up (shouldn't happen but safe)
+            // 2. A file that was already restored
+            // Do not delete files without backups as that could delete vanilla game files
+            if (!File.Exists(backupPath))
+                continue;
+
+            // Restore from backup
+            if (File.Exists(filePath))
                 File.Delete(filePath);
-                
-                // Clean up empty directories
-                var dir = Path.GetDirectoryName(filePath);
-                while (!string.IsNullOrEmpty(dir) && dir != targetBasePath && Directory.Exists(dir))
-                {
-                    if (Directory.GetFileSystemEntries(dir).Length == 0)
-                    {
-                        Directory.Delete(dir);
-                        dir = Path.GetDirectoryName(dir);
-                    }
-                    else
-                        break;
-                }
-            }
+            File.Move(backupPath, filePath);
         }
 
         var manifestPath = Path.Combine(targetBasePath, Constants.DEPLOY_MANIFEST_FILENAME);
