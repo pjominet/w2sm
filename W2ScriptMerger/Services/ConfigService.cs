@@ -60,16 +60,6 @@ public class ConfigService
 
     public string? GameCookedPCPath => string.IsNullOrEmpty(Config.GamePath) ? null : Path.Combine(Config.GamePath, "CookedPC");
 
-    public InstallLocation DefaultInstallLocation
-    {
-        get => Config.DefaultInstallLocation;
-        set
-        {
-            Config.DefaultInstallLocation = value;
-            Save();
-        }
-    }
-
     public string? LastModDirectory
     {
         get => Config.LastModDirectory;

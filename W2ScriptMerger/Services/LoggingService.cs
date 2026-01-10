@@ -3,7 +3,7 @@ using System.Text;
 
 namespace W2ScriptMerger.Services;
 
-public class LoggingService
+internal class LoggingService
 {
     private readonly string _currentLogPath;
     private string LogsDirectory { get; }

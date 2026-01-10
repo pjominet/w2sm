@@ -14,68 +14,82 @@ namespace W2ScriptMerger.Views;
 
 public partial class DiffMergeWindow
 {
-    private readonly ModConflict _conflict;
+    private readonly List<DzipConflict> _allDzipConflicts;
+    private readonly List<(DzipConflict Dzip, ScriptFileConflict Script)> _allScriptConflicts;
     private readonly Differ _differ = new();
+    
+    private int _currentConflictIndex;
     private int _selectedModIndex;
     private bool _isSyncingScroll;
 
     public bool MergeAccepted { get; private set; }
-    public byte[]? MergedContent { get; private set; }
+    public List<ResolvedConflict> ResolvedConflicts { get; } = [];
 
-    public DiffMergeWindow(ModConflict conflict)
+    private DzipConflict CurrentDzipConflict => _allScriptConflicts[_currentConflictIndex].Dzip;
+    private ScriptFileConflict CurrentScriptConflict => _allScriptConflicts[_currentConflictIndex].Script;
+
+    public DiffMergeWindow(DzipConflict initialDzip, ScriptFileConflict initialScript, List<DzipConflict> allConflicts)
     {
         InitializeComponent();
-        _conflict = conflict;
+        
+        _allDzipConflicts = allConflicts;
+        _allScriptConflicts = allConflicts
+            .SelectMany(d => d.ScriptConflicts.Select(s => (d, s)))
+            .Where(x => x.s.Status is ConflictStatus.Unresolved or ConflictStatus.NeedsManualResolution)
+            .ToList();
 
-        FileNameText.Text = conflict.OriginalFileName;
-        FilePathText.Text = conflict.RelativePath;
+        _currentConflictIndex = _allScriptConflicts.FindIndex(x => 
+            x.Dzip == initialDzip && x.Script == initialScript);
+        
+        if (_currentConflictIndex < 0)
+            _currentConflictIndex = 0;
 
-        // Populate mod version selector
-        foreach (var mod in conflict.ModVersions)
-            ModVersionSelector.Items.Add(mod.DzipSource);
+        LoadCurrentConflict();
+    }
+
+    private void LoadCurrentConflict()
+    {
+        var script = CurrentScriptConflict;
+        
+        FileNameText.Text = script.ScriptFileName;
+        FilePathText.Text = $"{CurrentDzipConflict.DzipName} / {script.ScriptRelativePath}";
+        ConflictIndexText.Text = $" ({_currentConflictIndex + 1}/{_allScriptConflicts.Count})";
+
+        ModVersionSelector.Items.Clear();
+        foreach (var mod in script.ModVersions)
+            ModVersionSelector.Items.Add(mod.ModName);
 
         if (ModVersionSelector.Items.Count > 0)
+        {
+            _selectedModIndex = 0;
             ModVersionSelector.SelectedIndex = 0;
-
-        // Set initial merge result
-        if (conflict.MergeContent is not null)
-            MergeResultEditor.Text = Encoding.UTF8.GetString(conflict.MergeContent);
-        else if (conflict.ModVersions.Count > 0)
-            MergeResultEditor.Text = Encoding.UTF8.GetString(File.ReadAllBytes(conflict.ModVersions[0].ContentPath));
-
-        // Show vanilla if available
-        if (conflict.VanillaContentPath is not null)
-        {
-            LeftPanelTitle.Text = "Vanilla Version";
-            UseVanillaButton.Visibility = Visibility.Visible;
         }
+
+        if (script.MergedContent is not null)
+            MergeResultEditor.Text = Encoding.ANSI1250.GetString(script.MergedContent);
+        else if (script.ModVersions.Count > 0)
+            MergeResultEditor.Text = Encoding.ANSI1250.GetString(File.ReadAllBytes(script.ModVersions[0].ScriptPath));
         else
-        {
-            LeftPanelTitle.Text = "No Vanilla Version";
-            UseVanillaButton.Visibility = Visibility.Collapsed;
-        }
+            MergeResultEditor.Text = Encoding.ANSI1250.GetString(File.ReadAllBytes(script.VanillaScriptPath));
 
         LoadDiffView();
+        UpdateNavigationButtons();
         UpdateStatus();
     }
 
     private void LoadDiffView()
     {
-        var vanillaText = _conflict.VanillaContentPath is not null
-            ? Encoding.UTF8.GetString(File.ReadAllBytes(_conflict.VanillaContentPath))
+        var script = CurrentScriptConflict;
+        
+        var vanillaText = File.Exists(script.VanillaScriptPath)
+            ? Extensions.EncodingExtensions.ReadFileWithEncoding(script.VanillaScriptPath)
             : string.Empty;
 
-        var modText = _selectedModIndex < _conflict.ModVersions.Count
-            ? Encoding.UTF8.GetString(File.ReadAllBytes(_conflict.ModVersions[_selectedModIndex].ContentPath))
+        var modText = _selectedModIndex < script.ModVersions.Count
+            ? Extensions.EncodingExtensions.ReadFileWithEncoding(script.ModVersions[_selectedModIndex].ScriptPath)
             : string.Empty;
 
-        // Build diff
-        var diffBuilder = new InlineDiffBuilder(_differ);
-
-        // Left panel - vanilla with diff highlighting
         DisplayDiffInRichTextBox(LeftDiffView, vanillaText, modText, isLeft: true);
-
-        // Right panel - mod with diff highlighting
         DisplayDiffInRichTextBox(RightDiffView, vanillaText, modText, isLeft: false);
     }
 
@@ -103,14 +117,12 @@ public partial class DiffMergeWindow
                 LineHeight = 1
             };
 
-            // Line number
             var lineNumRun = new Run($"{lineNumber,4} ")
             {
                 Foreground = new SolidColorBrush(Color.FromRgb(0x60, 0x60, 0x60))
             };
             paragraph.Inlines.Add(lineNumRun);
 
-            // Line content with highlighting
             var contentRun = new Run(line.Text ?? string.Empty);
 
             switch (line.Type)
@@ -144,6 +156,49 @@ public partial class DiffMergeWindow
         }
 
         rtb.Document = document;
+    }
+
+    private void UpdateNavigationButtons()
+    {
+        PrevConflictButton.IsEnabled = _currentConflictIndex > 0;
+        NextConflictButton.IsEnabled = _currentConflictIndex < _allScriptConflicts.Count - 1;
+    }
+
+    private void UpdateStatus()
+    {
+        var script = CurrentScriptConflict;
+        
+        var vanillaLines = File.Exists(script.VanillaScriptPath)
+            ? File.ReadAllLines(script.VanillaScriptPath).Length
+            : 0;
+
+        var modLines = _selectedModIndex >= 0 && _selectedModIndex < script.ModVersions.Count
+            ? File.ReadAllLines(script.ModVersions[_selectedModIndex].ScriptPath).Length
+            : 0;
+
+        var mergeLines = MergeResultEditor.Text.Split('\n').Length;
+
+        StatusText.Text = $"Vanilla: {vanillaLines} lines | Mod: {modLines} lines | Merge result: {mergeLines} lines | Resolved: {ResolvedConflicts.Count}/{_allScriptConflicts.Count}";
+    }
+
+    private void SaveCurrentMerge()
+    {
+        var content = Encoding.ANSI1250.GetBytes(MergeResultEditor.Text);
+        
+        var existing = ResolvedConflicts.FirstOrDefault(r => r.Script == CurrentScriptConflict);
+        if (existing is not null)
+        {
+            existing.MergedContent = content;
+        }
+        else
+        {
+            ResolvedConflicts.Add(new ResolvedConflict
+            {
+                Dzip = CurrentDzipConflict,
+                Script = CurrentScriptConflict,
+                MergedContent = content
+            });
+        }
     }
 
     private void ModVersionSelector_Changed(object sender, SelectionChangedEventArgs e)
@@ -180,25 +235,71 @@ public partial class DiffMergeWindow
 
     private void UseVanilla_Click(object sender, RoutedEventArgs e)
     {
-        if (_conflict.VanillaContentPath is null)
+        var script = CurrentScriptConflict;
+        if (!File.Exists(script.VanillaScriptPath))
             return;
 
-        MergeResultEditor.Text = Encoding.ANSI1250.GetString(File.ReadAllBytes(_conflict.VanillaContentPath));
+        MergeResultEditor.Text = Encoding.ANSI1250.GetString(File.ReadAllBytes(script.VanillaScriptPath));
         UpdateStatus();
     }
 
     private void UseMod_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedModIndex < 0 || _selectedModIndex >= _conflict.ModVersions.Count)
+        var script = CurrentScriptConflict;
+        if (_selectedModIndex < 0 || _selectedModIndex >= script.ModVersions.Count)
             return;
 
-        MergeResultEditor.Text = Encoding.ANSI1250.GetString(File.ReadAllBytes(_conflict.ModVersions[_selectedModIndex].ContentPath));
+        MergeResultEditor.Text = Encoding.ANSI1250.GetString(File.ReadAllBytes(script.ModVersions[_selectedModIndex].ScriptPath));
         UpdateStatus();
     }
 
-    private void CopyFromVanilla_Click(object sender, RoutedEventArgs e) => UseVanilla_Click(sender, e);
+    private void ResetToVanilla_Click(object sender, RoutedEventArgs e) => UseVanilla_Click(sender, e);
+    private void ResetToMod_Click(object sender, RoutedEventArgs e) => UseMod_Click(sender, e);
 
-    private void CopyFromMod_Click(object sender, RoutedEventArgs e) => UseMod_Click(sender, e);
+    private void PrevConflict_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentConflictIndex <= 0)
+            return;
+
+        SaveCurrentMerge();
+        _currentConflictIndex--;
+        LoadCurrentConflict();
+    }
+
+    private void NextConflict_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentConflictIndex >= _allScriptConflicts.Count - 1)
+            return;
+
+        SaveCurrentMerge();
+        _currentConflictIndex++;
+        LoadCurrentConflict();
+    }
+
+    private void AcceptAndContinue_Click(object sender, RoutedEventArgs e)
+    {
+        SaveCurrentMerge();
+
+        if (_currentConflictIndex < _allScriptConflicts.Count - 1)
+        {
+            _currentConflictIndex++;
+            LoadCurrentConflict();
+        }
+        else
+        {
+            MergeAccepted = true;
+            DialogResult = true;
+            Close();
+        }
+    }
+
+    private void AcceptAllAndClose_Click(object sender, RoutedEventArgs e)
+    {
+        SaveCurrentMerge();
+        MergeAccepted = true;
+        DialogResult = true;
+        Close();
+    }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
@@ -206,27 +307,11 @@ public partial class DiffMergeWindow
         DialogResult = false;
         Close();
     }
+}
 
-    private void SaveMerge_Click(object sender, RoutedEventArgs e)
-    {
-        MergeAccepted = true;
-        MergedContent = Encoding.UTF8.GetBytes(MergeResultEditor.Text);
-        DialogResult = true;
-        Close();
-    }
-
-    private void UpdateStatus()
-    {
-        var vanillaLines = _conflict.VanillaContentPath is not null
-            ? Encoding.UTF8.GetString(File.ReadAllBytes(_conflict.VanillaContentPath)).Split('\n').Length
-            : 0;
-
-        var modLines = _selectedModIndex >= 0 && _selectedModIndex < _conflict.ModVersions.Count
-            ? Encoding.UTF8.GetString(File.ReadAllBytes(_conflict.ModVersions[_selectedModIndex].ContentPath)).Split('\n').Length
-            : 0;
-
-        var mergeLines = MergeResultEditor.Text.Split('\n').Length;
-
-        StatusText.Text = $"Vanilla: {vanillaLines} lines | Mod: {modLines} lines | Merge result: {mergeLines} lines";
-    }
+public class ResolvedConflict
+{
+    public required DzipConflict Dzip { get; init; }
+    public required ScriptFileConflict Script { get; init; }
+    public required byte[] MergedContent { get; set; }
 }

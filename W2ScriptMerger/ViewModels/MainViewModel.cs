@@ -18,9 +18,10 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly ConfigService _configService;
     private readonly ArchiveService _archiveService;
-    private readonly GameFileService _gameFileService;
-    private readonly MergeService _mergeService;
-    private readonly InstallService _installService;
+    private readonly ScriptExtractionService _extractionService;
+    private readonly ConflictDetectionService _conflictDetectionService;
+    private readonly ScriptMergeService _mergeService;
+    private readonly DeploymentService _deploymentService;
     private readonly LoggingService _loggingService;
 
     private static string ModsListPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "loadedMods.json");
@@ -31,60 +32,58 @@ public partial class MainViewModel : ObservableObject
     };
 
     [ObservableProperty] private string _gamePath = string.Empty;
-
-    [ObservableProperty] private string _modStagingPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "modStaging");
-
+    [ObservableProperty] private string _modStagingPath = string.Empty;
     [ObservableProperty] private string _userContentPath = string.Empty;
-
     [ObservableProperty] private bool _isGamePathValid;
-
     [ObservableProperty] private string _statusMessage = "Ready";
-
     [ObservableProperty] private bool _isBusy;
-
-    [ObservableProperty] private InstallLocation _selectedInstallLocation = InstallLocation.UserContent;
-
-    [ObservableProperty] private ModConflict? _selectedConflict;
-
+    [ObservableProperty] private DzipConflict? _selectedDzipConflict;
+    [ObservableProperty] private ScriptFileConflict? _selectedScriptConflict;
     [ObservableProperty] private string _diffViewText = string.Empty;
-
     [ObservableProperty] private string _logText = string.Empty;
+    [ObservableProperty] private bool _hasPendingMergeChanges;
+    [ObservableProperty] private string _modSearchFilter = string.Empty;
 
     public ObservableCollection<ModArchive> LoadedMods { get; } = [];
-    public ObservableCollection<ModConflict> Conflicts { get; } = [];
+    public ObservableCollection<DzipConflict> DzipConflicts { get; } = [];
+    
+    public IEnumerable<ModArchive> FilteredMods => string.IsNullOrWhiteSpace(ModSearchFilter)
+        ? LoadedMods.OrderBy(m => m.DisplayName)
+        : LoadedMods.Where(m => m.DisplayName.Contains(ModSearchFilter, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(m => m.DisplayName);
+
+    partial void OnModSearchFilterChanged(string value) => OnPropertyChanged(nameof(FilteredMods));
     private ObservableCollection<string> LogMessages { get; } = [];
 
     public MainViewModel()
     {
         _loggingService = new LoggingService();
         _configService = new ConfigService(_jsonSerializerOptions);
-        _gameFileService = new GameFileService(_configService);
+        _extractionService = new ScriptExtractionService(_configService);
+        _conflictDetectionService = new ConflictDetectionService(_extractionService);
+        _mergeService = new ScriptMergeService(_extractionService);
         _archiveService = new ArchiveService(_configService);
-        _installService = new InstallService(_configService);
-        _mergeService = new MergeService(_gameFileService);
+        _deploymentService = new DeploymentService(_configService, _extractionService);
 
         GamePath = _configService.GamePath ?? string.Empty;
         ModStagingPath = _configService.ModStagingPath;
         UserContentPath = _configService.UserContentPath;
         IsGamePathValid = _configService.IsGamePathValid();
-        SelectedInstallLocation = _configService.DefaultInstallLocation;
 
         LogMessages.CollectionChanged += (_, _) => UpdateLogText();
 
         if (!IsGamePathValid)
             return;
 
-        Log("Game path validated. Building vanilla script index...");
+        Log("Game path validated. Extracting vanilla scripts...");
         Task.Run(async () =>
         {
-            await BuildGameScriptIndex();
+            await ExtractVanillaScripts();
             await DetectStagedMods();
         });
     }
 
     #region Private Helpers
-
-    partial void OnSelectedInstallLocationChanged(InstallLocation value) => _configService.DefaultInstallLocation = value;
 
     private void UpdateLogText() => LogText = string.Join(Environment.NewLine, LogMessages);
 
@@ -98,19 +97,19 @@ public partial class MainViewModel : ObservableObject
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss");
         var formatted = $"[{timestamp}] {message}";
-        LogMessages.Add(formatted);
+        Application.Current.Dispatcher.Invoke(() => LogMessages.Add(formatted));
         _loggingService.Log(message);
     }
 
-    private async Task BuildGameScriptIndex()
+    private async Task ExtractVanillaScripts()
     {
-        await Task.Run(async () =>
+        await Task.Run(() =>
         {
-            _gameFileService.BuildDzipIndex();
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            _extractionService.ExtractVanillaScripts();
+            Application.Current.Dispatcher.Invoke(() =>
             {
-                Log($"Indexed {_gameFileService.GetDzipIndexCount()} vanilla script archives");
-                StatusMessage = "Ready - Vanilla script archives indexed";
+                Log($"Indexed {_extractionService.VanillaDzipCount} vanilla script archives");
+                StatusMessage = "Ready - Vanilla scripts indexed";
             });
         });
     }
@@ -123,36 +122,49 @@ public partial class MainViewModel : ObservableObject
 
         var json = await File.ReadAllTextAsync(ModsListPath);
         var mods = JsonSerializer.Deserialize<List<ModArchive>>(json);
-        if (mods is not null)
-        {
-            Log($"Detected {mods.Count} staged mods");
-            await Application.Current.Dispatcher.InvokeAsync(async () =>
-            {
-                LoadedMods.Clear();
-                foreach (var mod in mods)
-                    LoadedMods.Add(mod);
+        if (mods is null)
+            return;
 
-                await DetectConflictsAsync();
-            });
-        }
+        var validMods = mods.Where(m =>
+            !string.IsNullOrEmpty(m.StagingPath) &&
+            Directory.Exists(m.StagingPath)).ToList();
+
+        if (validMods.Count < mods.Count)
+            Log($"Skipped {mods.Count - validMods.Count} mods with missing staging folders");
+
+        if (validMods.Count == 0)
+            return;
+
+        Log($"Detected {validMods.Count} staged mods");
+        await Application.Current.Dispatcher.InvokeAsync(async () =>
+        {
+            LoadedMods.Clear();
+            foreach (var mod in validMods)
+                LoadedMods.Add(mod);
+
+            await DetectConflictsAsync();
+        });
     }
 
     private async Task DetectConflictsAsync()
     {
-        Conflicts.Clear();
+        DzipConflicts.Clear();
 
         if (LoadedMods.Count == 0)
             return;
 
-        var conflicts = await Task.Run(() => _mergeService.DetectConflicts(LoadedMods.ToList()));
+        var conflicts = await Task.Run(() => _conflictDetectionService.DetectConflicts(LoadedMods.ToList()));
 
         foreach (var conflict in conflicts)
-            Conflicts.Add(conflict);
+            DzipConflicts.Add(conflict);
 
-        Log($"Detected {Conflicts.Count} potential conflicts");
+        var totalScripts = conflicts.Sum(c => c.ScriptConflicts.Count);
+        Log($"Detected {DzipConflicts.Count} dzip conflicts ({totalScripts} scripts)");
     }
 
     #endregion
+
+    #region Commands
 
     [RelayCommand]
     private async Task BrowseGamePath()
@@ -173,7 +185,7 @@ public partial class MainViewModel : ObservableObject
         {
             Log($"Game path set: {GamePath}");
             UserContentPath = _configService.UserContentPath;
-            await BuildGameScriptIndex();
+            await ExtractVanillaScripts();
         }
         else
         {
@@ -195,23 +207,7 @@ public partial class MainViewModel : ObservableObject
 
         ModStagingPath = dialog.FolderName;
         _configService.ModStagingPath = ModStagingPath;
-        Log($"Mod staging path set: {UserContentPath}");
-    }
-
-    [RelayCommand]
-    private void BrowseUserContent()
-    {
-        var dialog = new OpenFolderDialog
-        {
-            Title = "Select UserContent Folder"
-        };
-
-        if (dialog.ShowDialog() != true)
-            return;
-
-        UserContentPath = dialog.FolderName;
-        _configService.UserContentPath = UserContentPath;
-        Log($"UserContent path set: {UserContentPath}");
+        Log($"Mod staging path set: {ModStagingPath}");
     }
 
     [RelayCommand]
@@ -225,38 +221,39 @@ public partial class MainViewModel : ObservableObject
             InitialDirectory = _configService.LastModDirectory
         };
 
-        if (dialog.ShowDialog() is true)
+        if (dialog.ShowDialog() is not true)
+            return;
+
+        IsBusy = true;
+        StatusMessage = "Loading mods...";
+
+        var targetDirectory = Path.GetDirectoryName(dialog.FileNames.FirstOrDefault());
+        if (targetDirectory.HasValue())
+            _configService.LastModDirectory = targetDirectory;
+
+        foreach (var file in dialog.FileNames)
         {
-            IsBusy = true;
-            StatusMessage = "Loading mods...";
+            Log($"Loading: {Path.GetFileName(file)}");
 
-            var targetDirectory = Path.GetDirectoryName(dialog.FileNames.FirstOrDefault());
-            if (targetDirectory.HasValue())
-                _configService.LastModDirectory = targetDirectory;
+            var archive = await Task.Run(() => _archiveService.LoadModArchive(file));
 
-            foreach (var file in dialog.FileNames)
+            if (archive.IsLoaded)
             {
-                Log($"Loading: {Path.GetFileName(file)}");
-
-                var archive = await Task.Run(() => _archiveService.LoadModArchive(file));
-
-                if (archive.IsLoaded)
-                {
-                    LoadedMods.Add(archive);
-                    foreach (var modFile in archive.Files.Where(f => f.Type is ModFileType.Dzip))
-                        _gameFileService.AddDzip(modFile.Name);
-
-                    Log($"Mod {archive.ModName} staged");
-                }
-                else Log(archive.Error ?? "Failed to add mod: Unknown error");
+                LoadedMods.Add(archive);
+                Log($"Mod staged: {archive.DisplayName}");
             }
-
-            await UpdateLoadedModsList();
-            await DetectConflictsAsync();
-
-            IsBusy = false;
-            StatusMessage = $"Loaded {LoadedMods.Count} mods, {Conflicts.Count} conflicts detected";
+            else
+            {
+                Log(archive.Error ?? "Failed to add mod: Unknown error");
+            }
         }
+
+        await UpdateLoadedModsList();
+        await DetectConflictsAsync();
+        HasPendingMergeChanges = DzipConflicts.Any(c => c.HasUnresolvedConflicts);
+
+        IsBusy = false;
+        StatusMessage = $"Loaded {LoadedMods.Count} mods, {DzipConflicts.Count} conflicts detected";
     }
 
     [RelayCommand]
@@ -264,21 +261,35 @@ public partial class MainViewModel : ObservableObject
     {
         if (mod is null)
             return;
+
         try
         {
-            // Remove mod directory and all its contents
+            if (mod.IsDeployed)
+            {
+                _deploymentService.UndeployMod(mod);
+                Log($"Undeployed: {mod.DisplayName}");
+            }
+
             var modPath = Path.Combine(_configService.ModStagingPath, mod.ModName);
             DirectoryUtils.ClearDirectory(modPath);
-            Directory.Delete(modPath);
+            if (Directory.Exists(modPath))
+                Directory.Delete(modPath);
+
             LoadedMods.Remove(mod);
             await UpdateLoadedModsList();
-            Log($"Removed: {mod.ModName}");
+            Log($"Removed: {mod.DisplayName}");
 
-            // Re-detect conflicts
-            await Task.Run(async () =>
+            await DetectConflictsAsync();
+            HasPendingMergeChanges = true;
+
+            if (HasPendingMergeChanges)
             {
-                await Application.Current.Dispatcher.InvokeAsync(async () => await DetectConflictsAsync());
-            });
+                MessageBox.Show(
+                    "Mod removed. You may need to regenerate the merge if this mod was part of a conflict.",
+                    "Merge Update Required",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
         }
         catch (Exception ex)
         {
@@ -289,131 +300,134 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ClearMods()
     {
+        var result = MessageBox.Show(
+            "This will remove all staged mods and restore vanilla game files. Continue?",
+            "Purge All",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result is not MessageBoxResult.Yes)
+            return;
+
         try
         {
+            IsBusy = true;
+            StatusMessage = "Purging all mods...";
+
+            _deploymentService.PurgeDeployedMods(LoadedMods);
+
             DirectoryUtils.ClearDirectory(_configService.ModStagingPath);
+            _extractionService.CleanupExtractedFiles();
+
             LoadedMods.Clear();
-            Conflicts.Clear();
+            DzipConflicts.Clear();
             await UpdateLoadedModsList();
-            Log("Purged all mods");
+
+            HasPendingMergeChanges = false;
+            Log("Purged all mods and restored vanilla game");
             StatusMessage = "Ready";
         }
         catch (Exception ex)
         {
             Log($"Error purging mods: {ex.Message}");
         }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand]
-    private async Task AutoMergeAll()
+    private async Task StartMerge()
     {
-        if (Conflicts.Count == 0)
+        if (DzipConflicts.Count == 0)
         {
             StatusMessage = "No conflicts to merge";
             return;
         }
 
         IsBusy = true;
-        StatusMessage = "Attempting Auto-merge...";
+        StatusMessage = "Merging scripts...";
 
-        var autoMerged = 0;
-        var failed = 0;
+        var mergeResult = await Task.Run(() => _mergeService.StartMergeSession(DzipConflicts.ToList()));
 
-        foreach (var conflict in Conflicts)
+        Log($"Auto-merged {mergeResult.AutoMergedCount} scripts");
+
+        if (mergeResult.IsComplete)
         {
-            if (conflict.Status is not ConflictStatus.Unresolved)
-                continue;
+            _extractionService.WriteMergeManifest(DzipConflicts.ToList());
+            HasPendingMergeChanges = false;
+            StatusMessage = $"Merge complete - {mergeResult.AutoMergedCount} scripts merged";
+            Log("All conflicts resolved automatically");
+        }
+        else
+        {
+            Log($"{mergeResult.NeedsManualCount} scripts need manual resolution");
+            StatusMessage = $"Manual merge required for {mergeResult.NeedsManualCount} scripts";
 
-            await Task.Run(() => _mergeService.AttemptAutoMerge(conflict));
-            if (conflict.Status is ConflictStatus.AutoResolved)
+            if (mergeResult.FirstUnresolvedConflict.HasValue)
             {
-                autoMerged++;
-                Log($"Auto-merged: {conflict.OriginalFileName}");
-            }
-            else
-            {
-                failed++;
-                var conflictFiles = string.Join(", ", conflict.ConflictingFiles
-                    .Select(Path.GetFileName));
-                Log($"Needs manual merge: {conflictFiles} >> {conflict.OriginalFileName}");
+                var (dzip, script) = mergeResult.FirstUnresolvedConflict.Value;
+                SelectedDzipConflict = dzip;
+                SelectedScriptConflict = script;
+                OpenManualMergeEditor(dzip, script);
             }
         }
 
         IsBusy = false;
-        StatusMessage = $"Auto-merged {autoMerged} files, {failed} need manual intervention";
+        RefreshConflictsList();
     }
 
     [RelayCommand]
-    private void ViewConflictDiff()
+    private void OpenDebugMergeEditor()
     {
-        if (SelectedConflict is null)
+        var dzipConflict = SelectedDzipConflict ?? DzipConflicts.FirstOrDefault();
+        var scriptConflict = SelectedScriptConflict ?? dzipConflict?.ScriptConflicts.FirstOrDefault();
+
+        if (dzipConflict is null || scriptConflict is null)
+        {
+            MessageBox.Show("Select a script conflict first.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
-
-        if (SelectedConflict.VanillaContentPath is null)
-            _mergeService.PopulateConflictDiffData(SelectedConflict);
-
-        var sb = new StringBuilder();
-        sb.AppendLine($"=== Conflict: {SelectedConflict.RelativePath} ===");
-        sb.AppendLine();
-
-        if (SelectedConflict.VanillaContentPath is not null)
-        {
-            sb.AppendLine("--- VANILLA VERSION ---");
-            sb.AppendLine(Encoding.ANSI1250.GetString(File.ReadAllBytes(SelectedConflict.VanillaContentPath)));
-            sb.AppendLine();
         }
 
-        foreach (var mod in SelectedConflict.ModVersions)
-        {
-            sb.AppendLine($"--- MOD: {mod.DzipSource} ---");
-            sb.AppendLine(Encoding.ANSI1250.GetString(File.ReadAllBytes(mod.ContentPath)));
-            sb.AppendLine();
-        }
-
-        if (SelectedConflict.MergeContent is not null)
-        {
-            sb.AppendLine("--- MERGED RESULT ---");
-            sb.AppendLine(Encoding.ANSI1250.GetString(SelectedConflict.MergeContent));
-        }
-
-        DiffViewText = sb.ToString();
+        OpenManualMergeEditor(dzipConflict, scriptConflict);
     }
 
-    [RelayCommand]
-    private void OpenMergeEditor()
+    private void OpenManualMergeEditor(DzipConflict dzipConflict, ScriptFileConflict scriptConflict)
     {
-        if (SelectedConflict is null)
-            return;
-
-        if (SelectedConflict.VanillaContentPath is null)
-            _mergeService.PopulateConflictDiffData(SelectedConflict);
-
-        var mergeWindow = new DiffMergeWindow(SelectedConflict)
+        var mergeWindow = new DiffMergeWindow(dzipConflict, scriptConflict, DzipConflicts.ToList())
         {
             Owner = Application.Current.MainWindow
         };
 
-        if (mergeWindow.ShowDialog() != true || !mergeWindow.MergeAccepted)
+        if (mergeWindow.ShowDialog() != true)
             return;
 
-        SelectedConflict.MergeContent = mergeWindow.MergedContent;
-        SelectedConflict.Status = ConflictStatus.ManuallyResolved;
-        Log($"Manually merged: {SelectedConflict.OriginalFileName}");
-        StatusMessage = $"Merged: {SelectedConflict.OriginalFileName}";
+        foreach (var resolved in mergeWindow.ResolvedConflicts)
+        {
+            _mergeService.ApplyManualMerge(resolved.Dzip, resolved.Script, resolved.MergedContent);
+            Log($"Manually merged: {resolved.Script.ScriptFileName}");
+        }
 
-        // Refresh the conflict list to update status indicators
-        var index = Conflicts.IndexOf(SelectedConflict);
-        if (index < 0)
-            return;
+        var allResolved = DzipConflicts.All(c => c.IsFullyMerged);
+        if (allResolved)
+        {
+            _extractionService.WriteMergeManifest(DzipConflicts.ToList());
+            HasPendingMergeChanges = false;
+            StatusMessage = "All conflicts resolved";
+            Log("All conflicts resolved");
+        }
+        else
+        {
+            var remaining = DzipConflicts.Sum(c => c.ScriptConflicts.Count(s => s.Status is ConflictStatus.NeedsManualResolution));
+            StatusMessage = $"{remaining} scripts still need manual resolution";
+        }
 
-        var conflict = SelectedConflict;
-        Conflicts.RemoveAt(index);
-        Conflicts.Insert(index, conflict);
-        SelectedConflict = conflict;
+        RefreshConflictsList();
     }
 
     [RelayCommand]
-    private async Task InstallMergedFiles()
+    private async Task DeployMods()
     {
         if (!IsGamePathValid)
         {
@@ -421,11 +435,13 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        var pendingConflicts = Conflicts.Where(c => c.Status == ConflictStatus.Unresolved).ToList();
-        if (pendingConflicts.Count != 0)
+        var unresolvedCount = DzipConflicts.Sum(c => c.ScriptConflicts.Count(s =>
+            s.Status is ConflictStatus.Unresolved or ConflictStatus.NeedsManualResolution));
+
+        if (unresolvedCount > 0)
         {
             var result = MessageBox.Show(
-                $"There are {pendingConflicts.Count} unresolved conflicts. Continue anyway?",
+                $"There are {unresolvedCount} unresolved script conflicts. Deploy anyway?\n\nNote: Unmerged scripts will use vanilla versions.",
                 "Unresolved Conflicts",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
@@ -435,20 +451,23 @@ public partial class MainViewModel : ObservableObject
         }
 
         IsBusy = true;
-        StatusMessage = "Installing files...";
+        StatusMessage = "Deploying mods...";
 
         try
         {
-            var conflictPaths = new HashSet<string>(
-                Conflicts.Select(c => c.RelativePath.Replace('\\', '/').ToLowerInvariant()));
+            var mergedDzipNames = new HashSet<string>(
+                DzipConflicts.Where(c => c.IsFullyMerged).Select(c => c.DzipName),
+                StringComparer.OrdinalIgnoreCase);
 
-            // Install non-conflicting files from each mod
-            foreach (var mod in LoadedMods)
+            await Task.Run(() => _deploymentService.DeployMergedDzips(DzipConflicts.ToList()));
+            Log("Deployed merged scripts");
+
+            foreach (var mod in LoadedMods.Where(m => !m.IsDeployed))
             {
                 var installLocation = mod.ModInstallLocation;
                 if (installLocation == InstallLocation.Unknown)
                 {
-                    var dialog = new InstallLocationDialog(mod.ModName)
+                    var dialog = new InstallLocationDialog(mod.DisplayName)
                     {
                         Owner = Application.Current.MainWindow
                     };
@@ -456,39 +475,77 @@ public partial class MainViewModel : ObservableObject
                     if (dialog.ShowDialog() == true)
                     {
                         installLocation = dialog.SelectedLocation;
+                        mod.ModInstallLocation = installLocation;
                     }
                     else
                     {
-                        Log($"Skipped installing: {mod.ModName}");
+                        Log($"Skipped deploying: {mod.DisplayName}");
                         continue;
                     }
                 }
 
-                await Task.Run(() =>
-                    _installService.InstallNonConflictingFiles(mod, installLocation, conflictPaths));
-                Log($"Installed non-conflicting files from: {mod.ModName}");
+                await Task.Run(() => _deploymentService.DeployMod(mod, mergedDzipNames));
+                Log($"Deployed: {mod.DisplayName}");
             }
 
-            // Install merged files
-            var mergedCount = 0;
-            foreach (var conflict in Conflicts.Where(c => c.MergeContent is not null))
-            {
-                await Task.Run(() =>
-                    _installService.InstallMergedScript(conflict, SelectedInstallLocation));
-                mergedCount++;
-            }
-
-            Log($"Installed {mergedCount} merged scripts");
-            StatusMessage = $"Installation complete - {mergedCount} merged files installed";
+            await UpdateLoadedModsList();
+            StatusMessage = $"Deployed {LoadedMods.Count(m => m.IsDeployed)} mods";
         }
         catch (Exception ex)
         {
-            Log($"Error during installation: {ex.Message}");
-            StatusMessage = "Installation failed";
+            Log($"Error during deployment: {ex.Message}");
+            StatusMessage = "Deployment failed";
         }
         finally
         {
             IsBusy = false;
         }
     }
+
+    [RelayCommand]
+    private async Task RestoreVanilla()
+    {
+        var result = MessageBox.Show(
+            "This will restore all vanilla game files (remove deployed mods) but keep mods staged. Continue?",
+            "Restore Vanilla",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result is not MessageBoxResult.Yes)
+            return;
+
+        IsBusy = true;
+        StatusMessage = "Restoring vanilla game...";
+
+        try
+        {
+            await Task.Run(() => _deploymentService.RestoreAllBackups());
+
+            foreach (var mod in LoadedMods)
+                mod.IsDeployed = false;
+
+            await UpdateLoadedModsList();
+            Log("Restored vanilla game files");
+            StatusMessage = "Vanilla game restored";
+        }
+        catch (Exception ex)
+        {
+            Log($"Error restoring vanilla: {ex.Message}");
+            StatusMessage = "Restore failed";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void RefreshConflictsList()
+    {
+        var conflicts = DzipConflicts.ToList();
+        DzipConflicts.Clear();
+        foreach (var c in conflicts)
+            DzipConflicts.Add(c);
+    }
+
+    #endregion
 }
