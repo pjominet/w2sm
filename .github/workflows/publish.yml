@@ -1,8 +1,9 @@
-name: Build and Publish
+name: Build and Release
 
 on:
   push:
-    branches: [ master ]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -36,9 +37,13 @@ jobs:
           -p:IncludeAllContentForSelfExtract=true `
           --output ./publish
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
+    - name: Zip release
+      run: Compress-Archive -Path ./publish/* -DestinationPath ./w2sm-${{ github.ref_name }}-win-x64.zip
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
       with:
-        name: W2ScriptMerger-win-x64
-        path: ./publish/
-        retention-days: 30
+        files: ./w2sm-${{ github.ref_name }}-win-x64.zip
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
