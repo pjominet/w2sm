@@ -35,11 +35,13 @@ jobs:
     - name: Check if tag exists
       id: tag_check
       run: |
-        $tagExists = git ls-remote --tags origin "refs/tags/v${{ steps.version.outputs.VERSION }}" | Measure-Object -Line | Select-Object -ExpandProperty Lines
-        if ($tagExists -gt 0) {
+        $result = git ls-remote --tags origin "refs/tags/v${{ steps.version.outputs.VERSION }}"
+        if ($result) {
           echo "TAG_EXISTS=true" >> $env:GITHUB_OUTPUT
+          echo "Tag v${{ steps.version.outputs.VERSION }} already exists, skipping release"
         } else {
           echo "TAG_EXISTS=false" >> $env:GITHUB_OUTPUT
+          echo "Tag v${{ steps.version.outputs.VERSION }} does not exist, will create release"
         }
 
     - name: Publish
