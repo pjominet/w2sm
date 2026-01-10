@@ -10,8 +10,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
     private class DeploymentManifest
     {
         public DateTime DeployedAt { get; set; }
-        public List<string> BackedUpFiles { get; init; } = [];
-        public List<string> DeployedFiles { get; init; } = [];
+        public List<string> ManagedFiles { get; init; } = [];
     }
 
     public void DeployMod(ModArchive mod, HashSet<string> mergedDzipNames)
@@ -56,13 +55,11 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
             var targetPath = Path.Combine(targetBasePath, conflict.DzipName);
 
-            if (BackupIfExists(targetPath))
-                manifest.BackedUpFiles.Add(conflict.DzipName);
-
+            BackupIfExists(targetPath);
             File.Copy(packedDzipPath, targetPath, overwrite: true);
 
-            if (!manifest.DeployedFiles.Contains(conflict.DzipName))
-                manifest.DeployedFiles.Add(conflict.DzipName);
+            if (!manifest.ManagedFiles.Contains(conflict.DzipName))
+                manifest.ManagedFiles.Add(conflict.DzipName);
         }
 
         manifest.DeployedAt = DateTime.Now;
@@ -103,11 +100,8 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
     {
         var manifest = LoadOrCreateManifest(targetBasePath);
 
-        foreach (var deployedFile in manifest.DeployedFiles)
-        {
-            var filePath = Path.Combine(targetBasePath, deployedFile);
+        foreach (var filePath in manifest.ManagedFiles.Select(managedFile => Path.Combine(targetBasePath, managedFile)))
             RestoreBackup(filePath);
-        }
 
         var manifestPath = Path.Combine(targetBasePath, Constants.DEPLOY_MANIFEST_FILENAME);
         if (File.Exists(manifestPath))
