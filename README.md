@@ -21,12 +21,6 @@ When modding The Witcher 2, multiple mods often modify the same script files (`.
 - **Flexible installation** - Install to UserContent (Documents) or CookedPC (Game folder)
 - **Portable** - Configuration and logs saved alongside the executable, no registry or AppData clutter
 
-## Requirements
-
-- Windows 10/11
-- .NET 10.0 Runtime (or later)
-- The Witcher 2: Assassins of Kings
-
 ## Installation
 
 1. Download the latest release
