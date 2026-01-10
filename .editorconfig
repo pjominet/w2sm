@@ -13,7 +13,3 @@ max_line_length = 360
 [*.md]
 max_line_length = 180
 trim_trailing_whitespace = false
-
-[*.sqlproj]
-indent_size = 2
-insert_final_newline = false
