@@ -157,24 +157,23 @@ public class ScriptExtractionService(ConfigService configService)
         }
     }
 
-    public void PackMergedDzip(string dzipName)
+    public string? PackMergedDzip(string dzipName)
     {
         var sourceDir = Path.Combine(MergedScriptsPath, dzipName);
         if (!Directory.Exists(sourceDir))
-            return;
+            return null;
 
-        var outputPath = Path.Combine(MergedScriptsPath, $"{dzipName}.dzip.tmp");
-        var finalPath = Path.Combine(MergedScriptsPath, dzipName);
+        // Output to packed subfolder to avoid conflict with source directory
+        var packedFolder = Path.Combine(MergedScriptsPath, "packed");
+        Directory.CreateDirectory(packedFolder);
+        
+        var outputPath = Path.Combine(packedFolder, dzipName);
 
         if (File.Exists(outputPath))
             File.Delete(outputPath);
 
         DzipService.PackDzip(outputPath, sourceDir);
-
-        if (File.Exists(finalPath))
-            File.Delete(finalPath);
-
-        File.Move(outputPath, finalPath);
+        return outputPath;
     }
 
     public void CleanupExtractedFiles()

@@ -50,10 +50,8 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
         foreach (var conflict in conflicts.Where(c => c.IsFullyMerged))
         {
-            extractionService.PackMergedDzip(conflict.DzipName);
-
-            var mergedDzipPath = Path.Combine(extractionService.MergedScriptsPath, conflict.DzipName);
-            if (!File.Exists(mergedDzipPath))
+            var packedDzipPath = extractionService.PackMergedDzip(conflict.DzipName);
+            if (packedDzipPath is null)
                 continue;
 
             var targetPath = Path.Combine(targetBasePath, conflict.DzipName);
@@ -61,7 +59,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
             if (BackupIfExists(targetPath))
                 manifest.BackedUpFiles.Add(conflict.DzipName);
 
-            File.Copy(mergedDzipPath, targetPath, overwrite: true);
+            File.Copy(packedDzipPath, targetPath, overwrite: true);
 
             if (!manifest.DeployedFiles.Contains(conflict.DzipName))
                 manifest.DeployedFiles.Add(conflict.DzipName);
