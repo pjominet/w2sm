@@ -8,6 +8,19 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <converters:StringToVisibilityConverter x:Key="StringToVis"/>
 
+        <!-- Global ToolTip Style -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="#2D2D2D"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#555555"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Placement" Value="Top"/>
+            <Setter Property="VerticalOffset" Value="-4"/>
+            <Setter Property="HasDropShadow" Value="True"/>
+        </Style>
+
         <Style x:Key="DarkButton" TargetType="Button">
             <Setter Property="Background" Value="#3C3C3C"/>
             <Setter Property="Foreground" Value="#FFFFFF"/>
@@ -64,6 +77,48 @@
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="#148825"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource DarkButton}">
+            <Setter Property="Background" Value="#A4262C"/>
+            <Setter Property="BorderBrush" Value="#A4262C"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#C4464C"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#C4464C"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource DarkButton}">
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="IconButtonWarning" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Setter Property="Background" Value="#CA5010"/>
+            <Setter Property="BorderBrush" Value="#CA5010"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#DA6020"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="IconButtonDanger" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Setter Property="Background" Value="#A4262C"/>
+            <Setter Property="BorderBrush" Value="#A4262C"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#C4464C"/>
                 </Trigger>
             </Style.Triggers>
         </Style>

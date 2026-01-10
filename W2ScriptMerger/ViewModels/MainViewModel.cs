@@ -54,7 +54,7 @@ public partial class MainViewModel : ObservableObject
                     .OrderBy(m => m.DisplayName);
 
     partial void OnModSearchFilterChanged(string value) => OnPropertyChanged(nameof(FilteredMods));
-    
+
     partial void OnPromptForUnknownInstallLocationChanged(bool value) => _configService.PromptForUnknownInstallLocation = value;
 
     private ObservableCollection<string> LogMessages { get; } = [];
@@ -394,7 +394,25 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task ClearMods()
+    private void RestoreMod(ModArchive? mod)
+    {
+        if (mod is null || !mod.IsDeployed)
+            return;
+
+        try
+        {
+            _deploymentService.UndeployMod(mod);
+            Log($"Undeployed: {mod.DisplayName}");
+            StatusMessage = $"Undeployed {mod.DisplayName}";
+        }
+        catch (Exception ex)
+        {
+            Log($"Error undeploying mod: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeleteAllMods()
     {
         var result = MessageBox.Show(
             "This will remove all staged mods and restore vanilla game files. Continue?",

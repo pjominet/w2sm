@@ -73,8 +73,8 @@
                 <StackPanel Grid.Row="0" Margin="0,0,0,10">
                     <TextBlock Text="Staged Mods" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,8"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <Button Content="+ Add Mods" Command="{Binding AddModsCommand}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
-                        <Button Content="Clear All" Command="{Binding ClearModsCommand}" Style="{StaticResource DarkButton}"/>
+                        <Button Content="➕ Add Mods" Command="{Binding AddModsCommand}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
+                        <Button Content="🗑️ Delete All" Command="{Binding DeleteAllModsCommand}" Style="{StaticResource DangerButton}"/>
                     </StackPanel>
                     <TextBox Text="{Binding ModSearchFilter, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource DarkTextBox}"
@@ -117,14 +117,19 @@
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                    <Button Content="📁" ToolTip="Open folder"
+                                    <Button Content="📁" ToolTip="Open staging folder"
                                             Command="{Binding DataContext.OpenModFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
-                                            Style="{StaticResource DarkButton}" Padding="6,2" FontSize="10" Margin="0,0,4,0"/>
-                                    <Button Content="✕" ToolTip="Remove mod"
+                                            Style="{StaticResource IconButton}" Margin="4,0,0,0"/>
+                                    <Button Content="↩" ToolTip="Restore (to staged)"
+                                            Command="{Binding DataContext.RestoreModCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"
+                                            Style="{StaticResource IconButtonWarning}" Margin="4,0,0,0"
+                                            Visibility="{Binding IsDeployed, Converter={StaticResource BoolToVis}}"/>
+                                    <Button Content="➖" ToolTip="Remove mod"
                                             Command="{Binding DataContext.RemoveModCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
-                                            Style="{StaticResource DarkButton}" Padding="6,2" FontSize="10"/>
+                                            Style="{StaticResource IconButtonDanger}" Margin="4,0,0,0"/>
                                 </StackPanel>
                             </Grid>
                         </DataTemplate>
