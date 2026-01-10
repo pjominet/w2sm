@@ -10,14 +10,14 @@ When modding The Witcher 2, multiple mods often modify the same script files (`.
 - **Auto-merging** non-conflicting changes automatically
 - **Providing diff views** for manual conflict resolution
 - **Installing merged files** to the correct game directories
+- **Cleaning-up mod archives** so that mod archives with weird folder structures are recognized and properly installed 
 
 ## Features
 
-- **Native .dzip support** - Read and write Witcher 2's `.dzip` archive format without external tools
+### Core Features
+- **Native .dzip support** - Read and write Witcher 2's `.dzip` archive format, no need for Gibbed.RED tools
 - **Multi-format archive support** - Load mods from `.zip`, `.7z`, and `.rar` files
-- **Three-way merge** - Intelligently merge changes from multiple mods against vanilla scripts
-- **Conflict detection** - Automatically identify which scripts have conflicting modifications
-- **Integrated merge editor** - Side-by-side diff viewer with syntax highlighting and editable merge result
+- **Auto merge** - Intelligently merge changes from multiple mods against vanilla scripts if possible
 - **Flexible installation** - Install to UserContent (Documents) or CookedPC (Game folder)
 - **Portable** - Configuration and logs saved alongside the executable, no registry or AppData clutter
 
@@ -47,7 +47,7 @@ Example paths:
 
 ### Step 2: Add Mods
 
-Click **+ Add Mods** and select one or more mod archives (`.zip`, `.7z`, or `.rar` files).
+Click **+ Add Mods** and select one or more mod archives.
 
 The tool will:
 - Extract and scan all files in each archive
@@ -57,82 +57,49 @@ The tool will:
 
 ### Step 3: Review Conflicts
 
-The **Script Conflicts** panel shows all detected conflicts:
+The **Script Conflicts** panel shows all detected conflicts as a tree view:
 
-- 🟠 **Orange** - Pending (not yet merged)
+- 🔴 **Red** - Unresolved conflict
+- 🟠 **Orange** - Needs manual resolution
 - 🟢 **Green** - Auto-merged successfully
-- 🔵 **Blue** - Manually merged
-- 🔴 **Red** - Failed to merge
+- 🔵 **Blue** - Manually resolved
 
-Click on a conflict to select it, then:
-- **Open Merge Editor** - Launch the integrated side-by-side diff viewer with editable merge result
-- **View Diff** - Quick preview of all versions in the text panel
+Only scripts with actual changes are shown.
+
+Click on a conflict to select it, open readonly diff viewer to inspect potential changes
 
 ### Step 4: Auto-Merge
 
 Click **Auto-Merge All** to attempt automatic merging of all conflicts.
 
-The tool uses three-way merge logic:
+The manager uses three-way merge logic:
 - If changes don't overlap, they're merged automatically
-- If changes conflict (same lines modified differently), manual intervention is needed
+- If changes conflict (same lines modified differently), manual intervention is requested
 
 ### Step 5: Choose Install Location
 
 Select where to install the merged files:
 
 - **UserContent (Documents)** - `Documents\Witcher 2\UserContent`
-  - Recommended for most mods
-  - Easier to manage and remove
   
 - **CookedPC (Game Folder)** - `<GamePath>\CookedPC`
-  - Required for some mods
-  - Overwrites vanilla files (backup recommended)
 
 ### Step 6: Install
 
 Click **Install Merged Files** to:
-- Copy all non-conflicting mod files to the target location
-- Install merged scripts for resolved conflicts
-
-## File Locations
-
-| Location | Path | Purpose |
-|----------|------|---------|
-| Game Scripts | `<GamePath>\CookedPC\*.dzip` | Vanilla game scripts |
-| UserContent | `Documents\Witcher 2\UserContent` | User-installed mods |
-| Config | `<AppFolder>\config.json` | Application settings |
+- Copy all non-conflicting mod files to the game folder
+- Copy merged scripts for resolved conflicts to the game folder
+- The manager creates automatic backups of the original files in the game folder
 
 ## Troubleshooting
 
 ### "Invalid game path"
 Make sure you selected the main Witcher 2 folder, not a subfolder. The folder should contain `bin` and `CookedPC` directories.
 
-### Merge conflicts not auto-resolving
-Some conflicts require manual intervention when multiple mods change the same lines of code. Use the integrated merge editor to manually resolve these changes.
-
-## Technical Details
-
-### Supported File Types
-
-| Extension | Type | Support |
-|-----------|------|---------|
-| `.ws` | WitcherScript | Full merge support |
-| `.dzip` | Archive | Native read/write |
-| `.xml` | XML Config | Planned |
-| `.w2strings` | Localization | Planned |
-
-### Architecture
-
-- **WPF** with MVVM pattern (CommunityToolkit.Mvvm)
-- **SharpCompress** for archive handling
-- **DiffPlex** for diff/merge algorithms
-- **Native .dzip** implementation (no external tools required)
-
 ## Credits & Acknowledgments
 
-- Inspired by [Witcher 3 Script Merger](https://www.nexusmods.com/witcher3/mods/484) by AnotherSymbiworkaround
+- Inspired by [Witcher 3 Script Merger](https://www.nexusmods.com/witcher3/mods/484) by AnotherSymbiworkaround and [Script Merger - Fresh and Automated Edition](https://www.nexusmods.com/witcher3/mods/8405) by Phaz42
 - .dzip format research based on [Gibbed.RED](https://github.com/gibbed/Gibbed.RED) by Rick (gibbed)
-- Reference: [zpangwin's Witcher 2 Mod Merges](https://github.com/zpangwin/zpangwin-witcher2-mod-merges)
 
 ## License
 
@@ -147,5 +114,5 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 - [ ] XML file merging support
 - [ ] Localization file (.w2strings) support
 - [ ] Mod profiles/presets
-- [ ] Backup and restore functionality
 - [ ] Drag-and-drop mod loading
+- [ ] Nexus Mods integration
