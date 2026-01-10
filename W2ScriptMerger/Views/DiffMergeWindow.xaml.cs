@@ -33,6 +33,13 @@ public partial class DiffMergeWindow
             .Where(x => x.s.Status is ConflictStatus.Unresolved or ConflictStatus.NeedsManualResolution)
             .ToList();
 
+        if (_allScriptConflicts.Count == 0)
+        {
+            MessageBox.Show("All conflicts have been resolved.", "No Conflicts", MessageBoxButton.OK, MessageBoxImage.Information);
+            Loaded += (_, _) => Close();
+            return;
+        }
+
         _currentConflictIndex = _allScriptConflicts.FindIndex(x =>
             x.Dzip == initialDzip && x.Script == initialScript);
 
