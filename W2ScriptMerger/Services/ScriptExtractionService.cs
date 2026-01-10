@@ -4,7 +4,7 @@ using W2ScriptMerger.Tools;
 
 namespace W2ScriptMerger.Services;
 
-public class ScriptExtractionService(ConfigService configService)
+public class ScriptExtractionService(ConfigService configService, IndexerService indexerService)
 {
     private static string AppBasePath => AppDomain.CurrentDomain.BaseDirectory;
 
@@ -14,8 +14,6 @@ public class ScriptExtractionService(ConfigService configService)
 
     private readonly Dictionary<string, string> _vanillaDzipIndex = new(StringComparer.OrdinalIgnoreCase);
 
-    public int VanillaDzipCount => _vanillaDzipIndex.Count;
-
     public void ExtractVanillaScripts()
     {
         var cookedPcPath = configService.GameCookedPCPath;
@@ -23,23 +21,32 @@ public class ScriptExtractionService(ConfigService configService)
             return;
 
         Directory.CreateDirectory(VanillaScriptsPath);
+        _vanillaDzipIndex.Clear();
 
+        // Process dzips for script extraction
         var dzipFiles = Directory.GetFiles(cookedPcPath, "*.dzip", SearchOption.TopDirectoryOnly);
         foreach (var dzipPath in dzipFiles)
         {
             var dzipName = Path.GetFileName(dzipPath);
-            var extractPath = Path.Combine(VanillaScriptsPath, dzipName);
+
+            if (!indexerService.IsVanillaDzip(dzipName))
+                continue;
 
             _vanillaDzipIndex[dzipName] = dzipPath;
-
-            if (Directory.Exists(extractPath))
-                continue;
-
-            if (!DzipContainsScripts(dzipPath))
-                continue;
-
-            DzipService.UnpackDzipTo(dzipPath, extractPath);
+            ExtractDzipIfNeeded(dzipPath, dzipName);
         }
+    }
+
+    private void ExtractDzipIfNeeded(string dzipPath, string dzipName)
+    {
+        var extractPath = Path.Combine(VanillaScriptsPath, dzipName);
+        if (Directory.Exists(extractPath))
+            return;
+
+        if (!DzipContainsScripts(dzipPath))
+            return;
+
+        DzipService.UnpackDzipTo(dzipPath, extractPath);
     }
 
     public void ExtractModDzipForConflict(string modName, string modDzipPath, string dzipName)
@@ -171,11 +178,11 @@ public class ScriptExtractionService(ConfigService configService)
         // Create temp folder for combined output
         var packedFolder = Path.Combine(MergedScriptsPath, "packed");
         var tempCombinedDir = Path.Combine(packedFolder, $"{dzipName}_temp");
-        
+
         // Clean up any previous temp folder
         if (Directory.Exists(tempCombinedDir))
             Directory.Delete(tempCombinedDir, true);
-        
+
         Directory.CreateDirectory(tempCombinedDir);
 
         // Step 1: Copy ALL files from vanilla extraction

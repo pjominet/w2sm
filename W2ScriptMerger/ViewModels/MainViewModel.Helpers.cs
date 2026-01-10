@@ -29,11 +29,15 @@ public partial class MainViewModel
     {
         await Task.Run(() =>
         {
+            _indexerService.IndexVanillaFiles();
             _extractionService.ExtractVanillaScripts();
             Application.Current.Dispatcher.Invoke(() =>
             {
-                Log($"Indexed {_extractionService.VanillaDzipCount} vanilla script archives");
-                StatusMessage = "Ready - Vanilla scripts indexed";
+                var modDzipMsg = _indexerService.ModDzipCount > 0
+                    ? $", {_indexerService.ModDzipCount} mod dzips"
+                    : "";
+                Log($"Indexed {_indexerService.VanillaDzipCount} vanilla dzips{modDzipMsg}");
+                StatusMessage = "Ready - Scripts indexed";
             });
         });
     }

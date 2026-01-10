@@ -12,6 +12,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly ConfigService _configService;
     private readonly ArchiveService _archiveService;
+    private readonly IndexerService _indexerService;
     private readonly ScriptExtractionService _extractionService;
     private readonly ConflictDetectionService _conflictDetectionService;
     private readonly ScriptMergeService _mergeService;
@@ -48,7 +49,7 @@ public partial class MainViewModel : ObservableObject
         : LoadedMods.Where(m => m.DisplayName.Contains(ModSearchFilter, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(m => m.DisplayName);
 
-    public bool HasUnresolvedConflicts => DzipConflicts.Any(c => c.ScriptConflicts.Any(s => 
+    public bool HasUnresolvedConflicts => DzipConflicts.Any(c => c.ScriptConflicts.Any(s =>
         s.Status is ConflictStatus.Unresolved or ConflictStatus.NeedsManualResolution));
 
     partial void OnModSearchFilterChanged(string value) => OnPropertyChanged(nameof(FilteredMods));
@@ -61,7 +62,8 @@ public partial class MainViewModel : ObservableObject
     {
         _loggingService = new LoggingService();
         _configService = new ConfigService(_jsonSerializerOptions);
-        _extractionService = new ScriptExtractionService(_configService);
+        _indexerService = new IndexerService(_configService);
+        _extractionService = new ScriptExtractionService(_configService, _indexerService);
         _conflictDetectionService = new ConflictDetectionService(_extractionService);
         _mergeService = new ScriptMergeService(_extractionService);
         _archiveService = new ArchiveService(_configService);

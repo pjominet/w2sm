@@ -68,7 +68,7 @@ public partial class MainViewModel
             if (mod.IsDeployed)
             {
                 _deploymentService.RemoveMod(mod);
-                Log($"Undeployed: {mod.DisplayName}");
+                Log($"Deleted: {mod.DisplayName}");
             }
 
             var modPath = Path.Combine(_configService.ModStagingPath, mod.ModName);
@@ -79,7 +79,7 @@ public partial class MainViewModel
             LoadedMods.Remove(mod);
             OnPropertyChanged(nameof(FilteredMods));
             await UpdateLoadedModsList();
-            Log($"Removed: {mod.DisplayName}");
+            Log($"Deleted: {mod.DisplayName}");
 
             await DetectConflictsAsync();
             HasPendingMergeChanges = true;
@@ -87,8 +87,8 @@ public partial class MainViewModel
             if (HasPendingMergeChanges)
             {
                 MessageBox.Show(
-                    "Mod removed. You may need to regenerate the merge if this mod was part of a conflict.",
-                    "Merge Update Required",
+                    "Mod deleted. You may need to regenerate the merge if this mod was part of a conflict.",
+                    "Potential Merge Update Required",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
@@ -108,12 +108,12 @@ public partial class MainViewModel
         try
         {
             _deploymentService.RemoveMod(mod);
-            Log($"Undeployed: {mod.DisplayName}");
-            StatusMessage = $"Undeployed {mod.DisplayName}";
+            Log($"Removed: {mod.DisplayName}");
+            StatusMessage = $"Removed {mod.DisplayName}";
         }
         catch (Exception ex)
         {
-            Log($"Error undeploying mod: {ex.Message}");
+            Log($"Error removing mod: {ex.Message}");
         }
     }
 
@@ -121,7 +121,7 @@ public partial class MainViewModel
     private async Task PurgeMods()
     {
         var result = MessageBox.Show(
-            "This will remove all staged mods and restore vanilla game files. Continue?",
+            "This will remove all staged mods and restore all vanilla game files. Continue?",
             "Purge All",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);

@@ -32,7 +32,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
             if (!string.IsNullOrEmpty(dir))
                 Directory.CreateDirectory(dir);
 
-            var sourcePath = Path.Combine(mod.StagingPath, file.RelativePath);
+            var sourcePath = Path.Combine(mod.StagingPath, file.RelativePath.Replace('/', Path.DirectorySeparatorChar));
             if (File.Exists(sourcePath))
             {
                 File.Copy(sourcePath, targetPath, overwrite: true);
@@ -80,15 +80,18 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
             return;
 
         var targetBasePath = GetTargetPath(mod.ModInstallLocation);
+        var manifest = LoadOrCreateManifest(targetBasePath);
 
         foreach (var file in mod.Files)
         {
             var relativePath = GetDeployRelativePath(file.RelativePath);
             var targetPath = Path.Combine(targetBasePath, relativePath);
 
-            RestoreBackup(targetPath);
+            RestoreBackup(targetPath, targetBasePath);
+            manifest.ManagedFiles.Remove(relativePath);
         }
 
+        SaveManifest(targetBasePath, manifest);
         mod.IsDeployed = false;
     }
 
@@ -116,19 +119,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         foreach (var managedFile in manifest.ManagedFiles)
         {
             var filePath = Path.Combine(targetBasePath, managedFile);
-            var backupPath = filePath + Constants.BACKUP_FILE_EXTENSION;
-
-            // If no backup exists, leave the file alone as it's either:
-            // 1. A vanilla file that was never backed up (shouldn't happen but safe)
-            // 2. A file that was already restored
-            // Do not delete files without backups as that could delete vanilla game files
-            if (!File.Exists(backupPath))
-                continue;
-
-            // Restore from backup
-            if (File.Exists(filePath))
-                File.Delete(filePath);
-            File.Move(backupPath, filePath);
+            RestoreBackup(filePath, targetBasePath);
         }
 
         var manifestPath = Path.Combine(targetBasePath, Constants.DEPLOY_MANIFEST_FILENAME);
@@ -159,12 +150,12 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         var normalized = filePath.Replace('\\', '/');
 
         if (normalized.StartsWith("CookedPC/", StringComparison.OrdinalIgnoreCase))
-            return normalized["CookedPC/".Length..];
+            normalized = normalized["CookedPC/".Length..];
+        else if (normalized.StartsWith("UserContent/", StringComparison.OrdinalIgnoreCase))
+            normalized = normalized["UserContent/".Length..];
 
-        if (normalized.StartsWith("UserContent/", StringComparison.OrdinalIgnoreCase))
-            return normalized["UserContent/".Length..];
-
-        return normalized;
+        // Normalize to OS path separators for Path.Combine compatibility
+        return normalized.Replace('/', Path.DirectorySeparatorChar);
     }
 
     private static bool BackupIfExists(string filePath)
@@ -205,17 +196,40 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         File.WriteAllText(manifestPath, json);
     }
 
-    private static void RestoreBackup(string filePath)
+    private static void RestoreBackup(string filePath, string? stopAtDirectory = null)
     {
         var backupPath = filePath + Constants.BACKUP_FILE_EXTENSION;
 
-        if (!File.Exists(backupPath))
-            return;
-
-        if (File.Exists(filePath))
+        if (File.Exists(backupPath))
+        {
+            // Restore from backup (file existed before mod deployment)
+            if (File.Exists(filePath))
+                File.Delete(filePath);
+            File.Move(backupPath, filePath);
+        }
+        else if (File.Exists(filePath))
+        {
+            // No backup means this file was added by the mod - delete it
             File.Delete(filePath);
+            
+            // Clean up empty parent directories up to the stop directory
+            if (stopAtDirectory != null)
+                DeleteEmptyParentDirectories(Path.GetDirectoryName(filePath), stopAtDirectory);
+        }
+    }
 
-        File.Move(backupPath, filePath);
+    private static void DeleteEmptyParentDirectories(string? directory, string stopAtDirectory)
+    {
+        while (!string.IsNullOrEmpty(directory) && 
+               !string.Equals(directory, stopAtDirectory, StringComparison.OrdinalIgnoreCase) &&
+               Directory.Exists(directory))
+        {
+            if (Directory.EnumerateFileSystemEntries(directory).Any())
+                break; // Directory is not empty
+            
+            Directory.Delete(directory);
+            directory = Path.GetDirectoryName(directory);
+        }
     }
 
     private static void RestoreBackupsInDirectory(string? directoryPath)

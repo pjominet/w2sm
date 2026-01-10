@@ -1,4 +1,4 @@
-﻿namespace W2ScriptMerger.Tools;
+namespace W2ScriptMerger.Tools;
 
 // ReSharper disable InconsistentNaming
 internal static class Constants
@@ -14,4 +14,5 @@ internal static class Constants
     internal const string VANILLA_SCRIPTS_FOLDER = "vanilla_scripts";
     internal const string MOD_SCRIPTS_FOLDER = "mod_scripts";
     internal const string MERGED_SCRIPTS_FOLDER = "merged_scripts";
+    internal const string VANILLA_FILES_INDEX_FILENAME = "vanilla_files.json";
 }

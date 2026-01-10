@@ -73,7 +73,8 @@ public class ScriptMergeServiceTests
         {
             ModStagingPath = _tempPath
         };
-        var extractionService = new ScriptExtractionService(configService);
+        var vanillaIndexService = new IndexerService(configService);
+        var extractionService = new ScriptExtractionService(configService, vanillaIndexService);
         var mergeService = new ScriptMergeService(extractionService);
 
         var result = mergeService.AttemptAutoMerge(conflict);
@@ -124,7 +125,8 @@ public class ScriptMergeServiceTests
         {
             ModStagingPath = _tempPath
         };
-        var extractionService = new ScriptExtractionService(configService);
+        var vanillaIndexService = new IndexerService(configService);
+        var extractionService = new ScriptExtractionService(configService, vanillaIndexService);
         var mergeService = new ScriptMergeService(extractionService);
 
         var result = mergeService.AttemptAutoMerge(conflict);
