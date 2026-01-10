@@ -62,19 +62,19 @@ The **Script Conflicts** panel shows all detected conflicts as a tree view:
 
 Only scripts with actual changes are shown.
 
-Click on a conflict to select it, open readonly diff viewer to inspect potential changes
+Click on a conflict to select it, open readonly diff viewer to inspect potential changes.
 
 ### Step 4: Auto-Merge
 
-Click **Auto-Merge All** to attempt automatic merging of all conflicts.
+Click **Merge Scripts** to attempt automatic merging of all conflicts.
 
-The manager uses three-way merge logic:
+The manager attempts to auto merge as much as possible:
 - If changes don't overlap, they're merged automatically
 - If changes conflict (same lines modified differently), manual intervention is requested
 
 ### Step 5: Install
 
-Click **Install Merged Files** to:
+Click **Deploy Mods** to:
 - Copy all non-conflicting mod files to the game folder
 - Copy merged scripts for resolved conflicts to the game folder
 - The manager creates automatic backups of the original files in the game folder
