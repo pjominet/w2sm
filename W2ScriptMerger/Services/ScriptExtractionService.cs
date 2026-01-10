@@ -159,21 +159,59 @@ public class ScriptExtractionService(ConfigService configService)
 
     public string? PackMergedDzip(string dzipName)
     {
-        var sourceDir = Path.Combine(MergedScriptsPath, dzipName);
-        if (!Directory.Exists(sourceDir))
+        var mergedDir = Path.Combine(MergedScriptsPath, dzipName);
+        if (!Directory.Exists(mergedDir))
             return null;
 
-        // Output to packed subfolder to avoid conflict with source directory
-        var packedFolder = Path.Combine(MergedScriptsPath, "packed");
-        Directory.CreateDirectory(packedFolder);
-        
-        var outputPath = Path.Combine(packedFolder, dzipName);
+        // Get vanilla extraction path - contains ALL original files
+        var vanillaDir = Path.Combine(VanillaScriptsPath, dzipName);
+        if (!Directory.Exists(vanillaDir))
+            return null;
 
+        // Create temp folder for combined output
+        var packedFolder = Path.Combine(MergedScriptsPath, "packed");
+        var tempCombinedDir = Path.Combine(packedFolder, $"{dzipName}_temp");
+        
+        // Clean up any previous temp folder
+        if (Directory.Exists(tempCombinedDir))
+            Directory.Delete(tempCombinedDir, true);
+        
+        Directory.CreateDirectory(tempCombinedDir);
+
+        // Step 1: Copy ALL files from vanilla extraction
+        CopyDirectory(vanillaDir, tempCombinedDir);
+
+        // Step 2: Overlay merged files (overwrites vanilla versions)
+        CopyDirectory(mergedDir, tempCombinedDir);
+
+        // Step 3: Pack the combined directory
+        var outputPath = Path.Combine(packedFolder, dzipName);
         if (File.Exists(outputPath))
             File.Delete(outputPath);
 
-        DzipService.PackDzip(outputPath, sourceDir);
+        DzipService.PackDzip(outputPath, tempCombinedDir);
+
+        // Cleanup temp folder
+        Directory.Delete(tempCombinedDir, true);
+
         return outputPath;
+    }
+
+    private static void CopyDirectory(string sourceDir, string destDir)
+    {
+        Directory.CreateDirectory(destDir);
+
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var destFile = Path.Combine(destDir, Path.GetFileName(file));
+            File.Copy(file, destFile, overwrite: true);
+        }
+
+        foreach (var dir in Directory.GetDirectories(sourceDir))
+        {
+            var destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
+            CopyDirectory(dir, destSubDir);
+        }
     }
 
     public void CleanupExtractedFiles()
