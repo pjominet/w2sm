@@ -16,6 +16,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
     public void DeployMod(ModArchive mod, HashSet<string> mergedDzipNames)
     {
         var targetBasePath = GetTargetPath(mod.ModInstallLocation);
+        var manifest = LoadOrCreateManifest(targetBasePath);
 
         foreach (var file in mod.Files)
         {
@@ -33,9 +34,16 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
             var sourcePath = Path.Combine(mod.StagingPath, file.RelativePath);
             if (File.Exists(sourcePath))
+            {
                 File.Copy(sourcePath, targetPath, overwrite: true);
+                
+                if (!manifest.ManagedFiles.Contains(relativePath))
+                    manifest.ManagedFiles.Add(relativePath);
+            }
         }
 
+        manifest.DeployedAt = DateTime.Now;
+        SaveManifest(targetBasePath, manifest);
         mod.IsDeployed = true;
     }
 
@@ -93,15 +101,49 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
             RestoreBackupsInDirectory(cookedPcPath);
         }
 
-        RestoreBackupsInDirectory(configService.UserContentPath);
+        var userContentPath = configService.UserContentPath;
+        if (!string.IsNullOrEmpty(userContentPath) && Directory.Exists(userContentPath))
+        {
+            RestoreBackupsFromManifest(userContentPath);
+            RestoreBackupsInDirectory(userContentPath);
+        }
     }
 
     private static void RestoreBackupsFromManifest(string targetBasePath)
     {
         var manifest = LoadOrCreateManifest(targetBasePath);
 
-        foreach (var filePath in manifest.ManagedFiles.Select(managedFile => Path.Combine(targetBasePath, managedFile)))
-            RestoreBackup(filePath);
+        foreach (var managedFile in manifest.ManagedFiles)
+        {
+            var filePath = Path.Combine(targetBasePath, managedFile);
+            var backupPath = filePath + Constants.BACKUP_FILE_EXTENSION;
+
+            if (File.Exists(backupPath))
+            {
+                // Restore from backup
+                if (File.Exists(filePath))
+                    File.Delete(filePath);
+                File.Move(backupPath, filePath);
+            }
+            else if (File.Exists(filePath))
+            {
+                // No backup means this was a new file - delete it
+                File.Delete(filePath);
+                
+                // Clean up empty directories
+                var dir = Path.GetDirectoryName(filePath);
+                while (!string.IsNullOrEmpty(dir) && dir != targetBasePath && Directory.Exists(dir))
+                {
+                    if (Directory.GetFileSystemEntries(dir).Length == 0)
+                    {
+                        Directory.Delete(dir);
+                        dir = Path.GetDirectoryName(dir);
+                    }
+                    else
+                        break;
+                }
+            }
+        }
 
         var manifestPath = Path.Combine(targetBasePath, Constants.DEPLOY_MANIFEST_FILENAME);
         if (File.Exists(manifestPath))
