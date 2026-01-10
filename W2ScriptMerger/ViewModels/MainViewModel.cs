@@ -132,7 +132,8 @@ public partial class MainViewModel : ObservableObject
 
         var validMods = mods.Where(m =>
             !string.IsNullOrEmpty(m.StagingPath) &&
-            Directory.Exists(m.StagingPath)).ToList();
+            Directory.Exists(m.StagingPath) &&
+            m.Files.Count > 0).ToList();
 
         if (validMods.Count < mods.Count)
             Log($"Skipped {mods.Count - validMods.Count} mods with missing staging folders");
@@ -435,9 +436,13 @@ public partial class MainViewModel : ObservableObject
 
             LoadedMods.Clear();
             DzipConflicts.Clear();
+            OnPropertyChanged(nameof(FilteredMods));
+            
+            // Save empty mods list
             await UpdateLoadedModsList();
 
             HasPendingMergeChanges = false;
+            HasExistingMerge = false;
             Log("Purged all mods and restored vanilla game");
             StatusMessage = "Ready";
         }
@@ -471,6 +476,7 @@ public partial class MainViewModel : ObservableObject
         {
             _extractionService.WriteMergeManifest(DzipConflicts.ToList());
             HasPendingMergeChanges = false;
+            HasExistingMerge = true;
             StatusMessage = $"Merge complete - {mergeResult.AutoMergedCount} scripts merged";
             Log("All conflicts resolved automatically");
             ShowMergeSummary(mergeResult.AutoMergedCount, 0);
