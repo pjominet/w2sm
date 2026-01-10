@@ -10,31 +10,63 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
     public List<DzipConflict> DetectConflicts(IEnumerable<ModArchive> mods)
     {
         _conflicts.Clear();
+        var modDzipSources = new Dictionary<string, List<(ModArchive Mod, ModFile File)>>(StringComparer.OrdinalIgnoreCase);
 
+        // First pass: collect all dzip files from all mods
         foreach (var mod in mods)
         {
             foreach (var file in mod.Files.Where(f => f.Type == ModFileType.Dzip))
             {
                 var dzipName = file.Name;
-
-                if (!extractionService.IsVanillaDzip(dzipName))
-                    continue;
-
-                var vanillaDzipPath = extractionService.GetVanillaDzipPath(dzipName);
-                if (vanillaDzipPath is null)
-                    continue;
-
-                if (!_conflicts.TryGetValue(dzipName, out var conflict))
+                if (!modDzipSources.TryGetValue(dzipName, out var sources))
                 {
-                    conflict = new DzipConflict
-                    {
-                        DzipName = dzipName,
-                        VanillaDzipPath = vanillaDzipPath,
-                        VanillaExtractedPath = extractionService.GetVanillaExtractedPath(dzipName)
-                    };
-                    _conflicts[dzipName] = conflict;
+                    sources = [];
+                    modDzipSources[dzipName] = sources;
                 }
+                sources.Add((mod, file));
+            }
+        }
 
+        // Second pass: create conflicts only for:
+        // 1. Vanilla dzips that any mod modifies
+        // 2. Mod-added dzips that 2+ mods provide (conflict between mods)
+        foreach (var (dzipName, sources) in modDzipSources)
+        {
+            var isVanillaDzip = extractionService.IsVanillaDzip(dzipName);
+
+            switch (isVanillaDzip)
+            {
+                // For vanilla dzips, we need at least 1 mod; for mod-added, we need 2+ mods
+                case false when sources.Count < 2:
+                // Vanilla dzips need at least one mod to create a conflict
+                case true when sources.Count < 1:
+                    continue;
+            }
+
+            var vanillaDzipPath = extractionService.GetVanillaDzipPath(dzipName);
+            string vanillaExtractedPath;
+
+            if (isVanillaDzip && vanillaDzipPath is not null)
+                vanillaExtractedPath = extractionService.GetVanillaExtractedPath(dzipName);
+            else
+            {
+                // For mod-added dzips, use the first mod's version as the "base"
+                var firstSource = sources[0];
+                vanillaDzipPath = Path.Combine(firstSource.Mod.StagingPath, firstSource.File.RelativePath);
+                vanillaExtractedPath = extractionService.GetModExtractedPath(firstSource.Mod.ModName, dzipName);
+            }
+
+            var conflict = new DzipConflict
+            {
+                DzipName = dzipName,
+                VanillaDzipPath = vanillaDzipPath,
+                VanillaExtractedPath = vanillaExtractedPath,
+                IsAddedByMod = !isVanillaDzip
+            };
+            _conflicts[dzipName] = conflict;
+
+            foreach (var (mod, file) in sources)
+            {
                 var modDzipPath = Path.Combine(mod.StagingPath, file.RelativePath);
                 conflict.ModSources.Add(new ModDzipSource
                 {
@@ -47,11 +79,10 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
         }
 
         foreach (var conflict in _conflicts.Values)
-        {
             ExtractAndAnalyzeConflict(conflict);
-        }
 
-        return _conflicts.Values.ToList();
+        // Filter out conflicts with no script changes
+        return _conflicts.Values.Where(c => c.ScriptConflicts.Count > 0).ToList();
     }
 
     private void ExtractAndAnalyzeConflict(DzipConflict conflict)

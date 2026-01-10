@@ -6,7 +6,8 @@ public class DzipConflict
 {
     public required string DzipName { get; init; }
     public required string VanillaDzipPath { get; init; }
-    public string VanillaExtractedPath { get; set; } = string.Empty;
+    public string VanillaExtractedPath { get; init; } = string.Empty;
+    public bool IsAddedByMod { get; init; }
     public List<ModDzipSource> ModSources { get; } = [];
     public List<ScriptFileConflict> ScriptConflicts { get; } = [];
     public bool IsFullyMerged => ScriptConflicts.Count > 0 && ScriptConflicts.All(c => c.Status is ConflictStatus.AutoResolved or ConflictStatus.ManuallyResolved);
@@ -18,7 +19,7 @@ public class ModDzipSource
     public required string ModName { get; init; }
     public string DisplayName { get; init; } = string.Empty;
     public required string DzipPath { get; init; }
-    public string ExtractedPath { get; set; } = string.Empty;
+    public string ExtractedPath { get; init; } = string.Empty;
 }
 
 public class ScriptFileConflict
@@ -29,7 +30,7 @@ public class ScriptFileConflict
     public List<ModScriptVersion> ModVersions { get; } = [];
     public ConflictStatus Status { get; set; } = ConflictStatus.Unresolved;
     public byte[]? MergedContent { get; set; }
-    public string? CurrentMergeBasePath { get; set; }
+    public string? CurrentMergeBasePath { get; init; }
 }
 
 public class ModScriptVersion
