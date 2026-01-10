@@ -18,7 +18,7 @@ public partial class ModArchive : INotifyPropertyChanged
 
     public string? NexusId => GetNexusId();
 
-    public List<ModFile> Files { get; } = [];
+    public List<ModFile> Files { get; set; } = [];
 
     public InstallLocation ModInstallLocation { get; set; } = InstallLocation.CookedPC;
 
