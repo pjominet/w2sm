@@ -2,6 +2,8 @@
 
 A script merger and mod manager for **The Witcher 2: Assassins of Kings**, inspired by the popular [Script Merger for The Witcher 3](https://www.nexusmods.com/witcher3/mods/484).
 
+![Demo Image](W2ScriptMerger/Assets/demo.png)
+
 ## Overview
 
 When modding The Witcher 2, multiple mods often modify the same script files (`.ws` files inside `.dzip` archives). Installing these mods by simply overwriting files means only one mod's changes will take effect. This tool solves that problem by:
