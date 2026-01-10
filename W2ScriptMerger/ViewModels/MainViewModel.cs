@@ -43,6 +43,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _hasPendingMergeChanges;
     [ObservableProperty] private bool _hasExistingMerge;
     [ObservableProperty] private string _modSearchFilter = string.Empty;
+    [ObservableProperty] private bool _promptForUnknownInstallLocation;
 
     private ObservableCollection<ModArchive> LoadedMods { get; } = [];
     public ObservableCollection<DzipConflict> DzipConflicts { get; } = [];
@@ -53,6 +54,8 @@ public partial class MainViewModel : ObservableObject
                     .OrderBy(m => m.DisplayName);
 
     partial void OnModSearchFilterChanged(string value) => OnPropertyChanged(nameof(FilteredMods));
+    
+    partial void OnPromptForUnknownInstallLocationChanged(bool value) => _configService.PromptForUnknownInstallLocation = value;
 
     private ObservableCollection<string> LogMessages { get; } = [];
 
@@ -70,6 +73,7 @@ public partial class MainViewModel : ObservableObject
         ModStagingPath = _configService.ModStagingPath;
         UserContentPath = _configService.UserContentPath;
         IsGamePathValid = _configService.IsGamePathValid();
+        PromptForUnknownInstallLocation = _configService.PromptForUnknownInstallLocation;
 
         LogMessages.CollectionChanged += (_, _) => UpdateLogText();
 
@@ -551,23 +555,26 @@ public partial class MainViewModel : ObservableObject
 
             foreach (var mod in LoadedMods.Where(m => !m.IsDeployed))
             {
-                var installLocation = mod.ModInstallLocation;
-                if (installLocation == InstallLocation.Unknown)
+                if (mod.ModInstallLocation == InstallLocation.Unknown)
                 {
-                    var dialog = new InstallLocationDialog(mod.DisplayName)
+                    if (PromptForUnknownInstallLocation)
                     {
-                        Owner = Application.Current.MainWindow
-                    };
+                        var dialog = new InstallLocationDialog(mod.DisplayName)
+                        {
+                            Owner = Application.Current.MainWindow
+                        };
 
-                    if (dialog.ShowDialog() == true)
-                    {
-                        installLocation = dialog.SelectedLocation;
-                        mod.ModInstallLocation = installLocation;
+                        if (dialog.ShowDialog() == true)
+                            mod.ModInstallLocation = dialog.SelectedLocation;
+                        else
+                        {
+                            Log($"Skipped: {mod.DisplayName}");
+                            continue;
+                        }
                     }
                     else
                     {
-                        Log($"Skipped deploying: {mod.DisplayName}");
-                        continue;
+                        mod.ModInstallLocation = InstallLocation.CookedPC;
                     }
                 }
 

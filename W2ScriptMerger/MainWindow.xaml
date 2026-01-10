@@ -134,8 +134,12 @@
                 <!-- Action Buttons -->
                 <StackPanel Grid.Row="2" Margin="0,15,0,0">
                     <Button Content="🔀 Merge Scripts" Command="{Binding StartMergeCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,0,8"/>
+                    <CheckBox Content="Prompt for unknown install location"
+                              IsChecked="{Binding PromptForUnknownInstallLocation}"
+                              Style="{StaticResource DarkCheckBox}"
+                              ToolTip="When enabled, prompts for deploy location on mods without CookedPC/UserContent folder structure. Otherwise defaults to CookedPC." Margin="0,0,0,8"/>
                     <Button Content="📦 Deploy Mods" Command="{Binding DeployModsCommand}" Style="{StaticResource AccentButton}" Margin="0,0,0,8"/>
-                    <Button Content="🔄 Restore Vanilla" Command="{Binding RestoreVanillaCommand}" Style="{StaticResource DarkButton}"/>
+                    <Button Content="🔄 Restore Vanilla" Command="{Binding RestoreVanillaCommand}" Style="{StaticResource DarkButton}" Margin="0,0,0,8"/>
                 </StackPanel>
             </Grid>
 
@@ -214,7 +218,7 @@
                 <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10">
                     <Button x:Name="DebugMergeEditorButton" Content="✏ Debug Merge Editor" Command="{Binding OpenDebugMergeEditorCommand}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
                     <Button x:Name="ViewDiffButton" Content="👁 View Diff" Command="{Binding ViewDiffCommand}" Style="{StaticResource DarkButton}" Visibility="Collapsed"/>
-                    <Button Content="📋 View Merge Summary" Command="{Binding ViewMergeSummaryCommand}" Style="{StaticResource DarkButton}"
+                    <Button Content="📋 View Merge Summary" Command="{Binding ViewMergeSummaryCommand}" Style="{StaticResource SuccessButton}"
                             Visibility="{Binding HasExistingMerge, Converter={StaticResource BoolToVis}}" Margin="0,0,8,0"/>
                 </StackPanel>
 

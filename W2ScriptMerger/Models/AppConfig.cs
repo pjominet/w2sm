@@ -7,6 +7,7 @@ internal class AppConfig
     public string? ModStagingPath { get; set; }
     public string? UserContentPath { get; set; }
     public string? LastModDirectory { get; set; }
+    public bool PromptForUnknownInstallLocation { get; set; }
 }
 
 public enum InstallLocation

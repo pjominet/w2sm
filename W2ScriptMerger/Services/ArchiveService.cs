@@ -47,8 +47,9 @@ public class ArchiveService(ConfigService configService)
                     }
                     else
                     {
+                        // Mark as Unknown - will be resolved during deployment based on user preference
                         modArchive.ModInstallLocation = InstallLocation.Unknown;
-                        fileStagingPath = $"CookedPC/{normalizedPath}"; // assume CookedPC for loose files & folders
+                        fileStagingPath = $"CookedPC/{normalizedPath}"; // Stage to CookedPC by default
                     }
 
                     await using var entryStream = await entry.OpenEntryStreamAsync(ctx ?? CancellationToken.None);

@@ -72,6 +72,16 @@ public class ConfigService
         }
     }
 
+    public bool PromptForUnknownInstallLocation
+    {
+        get => Config.PromptForUnknownInstallLocation;
+        set
+        {
+            Config.PromptForUnknownInstallLocation = value;
+            Save();
+        }
+    }
+
     public bool IsGamePathValid()
     {
         if (string.IsNullOrEmpty(Config.GamePath))
