@@ -12,6 +12,7 @@ public class DzipConflict
     public List<ScriptFileConflict> ScriptConflicts { get; } = [];
     public bool IsFullyMerged => ScriptConflicts.Count > 0 && ScriptConflicts.All(c => c.Status is ConflictStatus.AutoResolved or ConflictStatus.ManuallyResolved);
     public bool HasUnresolvedConflicts => ScriptConflicts.Any(c => c.Status is ConflictStatus.Unresolved or ConflictStatus.NeedsManualResolution);
+    public string ModNamesDisplay => string.Join(", ", ModSources.Select(m => m.DisplayName));
 }
 
 public class ModDzipSource

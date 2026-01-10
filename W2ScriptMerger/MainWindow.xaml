@@ -179,7 +179,7 @@
                     <TreeView.ItemTemplate>
                         <HierarchicalDataTemplate ItemsSource="{Binding ScriptConflicts}">
                             <StackPanel Orientation="Horizontal">
-                                <Ellipse Width="10" Height="10" Margin="0,0,8,0">
+                                <Ellipse Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center">
                                     <Ellipse.Style>
                                         <Style TargetType="Ellipse">
                                             <Setter Property="Fill" Value="#FF4444"/>
@@ -191,8 +191,13 @@
                                         </Style>
                                     </Ellipse.Style>
                                 </Ellipse>
-                                <TextBlock Text="{Binding DzipName}" FontWeight="SemiBold" Foreground="#FFFFFF"/>
-                                <TextBlock Text="{Binding ModSources.Count, StringFormat=' ({0} mods)'}" Foreground="#888888"/>
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding DzipName}" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="{Binding ModSources.Count, StringFormat=' ({0} mods)'}" Foreground="#888888"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding ModNamesDisplay}" FontSize="11" Foreground="#666666" Margin="0,2,0,0"/>
+                                </StackPanel>
                             </StackPanel>
 
                             <HierarchicalDataTemplate.ItemTemplate>
