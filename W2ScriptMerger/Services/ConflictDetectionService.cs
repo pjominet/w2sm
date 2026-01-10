@@ -38,7 +38,8 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
                 var modDzipPath = Path.Combine(mod.StagingPath, file.RelativePath);
                 conflict.ModSources.Add(new ModDzipSource
                 {
-                    ModName = mod.ModName,  // Use ModName consistently (not DisplayName)
+                    ModName = mod.ModName,
+                    DisplayName = mod.DisplayName,
                     DzipPath = modDzipPath,
                     ExtractedPath = extractionService.GetModExtractedPath(mod.ModName, dzipName)
                 });
@@ -86,6 +87,7 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
                     modVersions.Add(new ModScriptVersion
                     {
                         ModName = modSource.ModName,
+                        DisplayName = modSource.DisplayName,
                         ScriptPath = modScriptPath
                     });
                 }

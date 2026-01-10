@@ -10,6 +10,14 @@ public partial class MainWindow
     public MainWindow()
     {
         InitializeComponent();
+        
+#if DEBUG
+        DebugMergeEditorButton.Visibility = Visibility.Visible;
+        ViewDiffButton.Visibility = Visibility.Collapsed;
+#else
+        DebugMergeEditorButton.Visibility = Visibility.Collapsed;
+        ViewDiffButton.Visibility = Visibility.Visible;
+#endif
     }
 
     private void ConflictTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)

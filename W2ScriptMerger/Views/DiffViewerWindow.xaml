@@ -1,0 +1,121 @@
+<Window x:Class="W2ScriptMerger.Views.DiffViewerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Diff Viewer"
+        Height="800" Width="1400"
+        MinHeight="600" MinWidth="1000"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E1E">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#252526" Padding="15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Column="0" Grid.Row="0" Orientation="Horizontal">
+                    <TextBlock x:Name="FileNameText" Text="script.ws" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF"/>
+                    <TextBlock x:Name="ConflictIndexText" Text=" (1/5)" FontSize="14" Foreground="#888888" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                </StackPanel>
+                
+                <TextBlock x:Name="FilePathText" Grid.Row="1" Grid.Column="0" Text="path/to/script.ws" FontSize="11" Foreground="#888888" Margin="0,4,0,0"/>
+
+                <StackPanel Grid.Column="1" Grid.Row="0" Grid.RowSpan="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="PrevConflictButton" Content="◀ Previous Script" Click="PrevConflict_Click" Style="{StaticResource AccentButton}" Margin="0,0,8,0"/>
+                    <Button x:Name="NextConflictButton" Content="Next Script ▶" Click="NextConflict_Click" Style="{StaticResource AccentButton}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Diff Panels -->
+        <Grid Grid.Row="1" Margin="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Panel - Base Version -->
+            <Border Grid.Column="0" Background="#252526" CornerRadius="4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="#333333" Padding="10,6">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Base Version" FontWeight="SemiBold" Foreground="#CCCCCC" VerticalAlignment="Center"/>
+                            <Button Content="▲" ToolTip="Previous diff" Click="PrevDiff_Click" Style="{StaticResource DarkButton}" Padding="6,2" Margin="15,0,4,0" FontSize="10"/>
+                            <Button Content="▼" ToolTip="Next diff" Click="NextDiff_Click" Style="{StaticResource DarkButton}" Padding="6,2" FontSize="10"/>
+                            <TextBlock x:Name="DiffPositionText" Text="" Foreground="#888888" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="11"/>
+                        </StackPanel>
+                    </Border>
+
+                    <RichTextBox x:Name="LeftDiffView" Grid.Row="1" 
+                                 Background="#1E1E1E" Foreground="#D4D4D4"
+                                 FontFamily="Consolas" FontSize="12"
+                                 IsReadOnly="True" 
+                                 VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 BorderThickness="0"
+                                 ScrollViewer.ScrollChanged="SyncScroll_Left"/>
+                </Grid>
+            </Border>
+
+            <!-- Right Panel - Mod Version -->
+            <Border Grid.Column="2" Background="#252526" CornerRadius="4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="#333333" Padding="10,6">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Conflicting Mod: " FontWeight="SemiBold" Foreground="#CCCCCC" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox x:Name="ModVersionSelector" MinWidth="200" SelectionChanged="ModVersionSelector_Changed"
+                                      Style="{StaticResource DarkComboBox}" ItemContainerStyle="{StaticResource DarkComboBoxItem}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <RichTextBox x:Name="RightDiffView" Grid.Row="1" 
+                                 Background="#1E1E1E" Foreground="#D4D4D4"
+                                 FontFamily="Consolas" FontSize="12"
+                                 IsReadOnly="True" 
+                                 VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 BorderThickness="0"
+                                 ScrollViewer.ScrollChanged="SyncScroll_Right"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Background="#252526" Padding="15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="StatusText" Grid.Column="0" Foreground="#888888" VerticalAlignment="Center"/>
+
+                <Button Grid.Column="1" Content="Close" Click="Close_Click" Style="{StaticResource DarkButton}" Padding="15,8"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

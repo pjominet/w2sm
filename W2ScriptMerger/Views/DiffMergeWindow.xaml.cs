@@ -2,25 +2,21 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Media;
-using DiffPlex;
-using DiffPlex.DiffBuilder;
-using DiffPlex.DiffBuilder.Model;
-using W2ScriptMerger.Models;
 using W2ScriptMerger.Extensions;
+using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Views;
 
 public partial class DiffMergeWindow
 {
-    private readonly List<DzipConflict> _allDzipConflicts;
     private readonly List<(DzipConflict Dzip, ScriptFileConflict Script)> _allScriptConflicts;
-    private readonly Differ _differ = new();
-    
+
     private int _currentConflictIndex;
     private int _selectedModIndex;
     private bool _isSyncingScroll;
+    private List<int> _diffLinePositions = [];
+    private int _currentDiffIndex = -1;
 
     public bool MergeAccepted { get; private set; }
     public List<ResolvedConflict> ResolvedConflicts { get; } = [];
@@ -31,16 +27,15 @@ public partial class DiffMergeWindow
     public DiffMergeWindow(DzipConflict initialDzip, ScriptFileConflict initialScript, List<DzipConflict> allConflicts)
     {
         InitializeComponent();
-        
-        _allDzipConflicts = allConflicts;
+
         _allScriptConflicts = allConflicts
             .SelectMany(d => d.ScriptConflicts.Select(s => (d, s)))
             .Where(x => x.s.Status is ConflictStatus.Unresolved or ConflictStatus.NeedsManualResolution)
             .ToList();
 
-        _currentConflictIndex = _allScriptConflicts.FindIndex(x => 
+        _currentConflictIndex = _allScriptConflicts.FindIndex(x =>
             x.Dzip == initialDzip && x.Script == initialScript);
-        
+
         if (_currentConflictIndex < 0)
             _currentConflictIndex = 0;
 
@@ -50,14 +45,14 @@ public partial class DiffMergeWindow
     private void LoadCurrentConflict()
     {
         var script = CurrentScriptConflict;
-        
+
         FileNameText.Text = script.ScriptFileName;
-        FilePathText.Text = $"{CurrentDzipConflict.DzipName} / {script.ScriptRelativePath}";
+        FilePathText.Text = $"{CurrentDzipConflict.DzipName}\\{script.ScriptRelativePath.Replace('/', '\\')}";
         ConflictIndexText.Text = $" ({_currentConflictIndex + 1}/{_allScriptConflicts.Count})";
 
         ModVersionSelector.Items.Clear();
         foreach (var mod in script.ModVersions)
-            ModVersionSelector.Items.Add(mod.ModName);
+            ModVersionSelector.Items.Add(string.IsNullOrEmpty(mod.DisplayName) ? mod.ModName : mod.DisplayName);
 
         if (ModVersionSelector.Items.Count > 0)
         {
@@ -75,12 +70,21 @@ public partial class DiffMergeWindow
         LoadDiffView();
         UpdateNavigationButtons();
         UpdateStatus();
+        UpdateMergeLineNumbers();
+
+        // Jump to first diff with padding
+        if (_diffLinePositions.Count <= 0)
+            return;
+
+        _currentDiffIndex = 0;
+        Dispatcher.BeginInvoke(() => ScrollToDiffWithPadding(0, 3), System.Windows.Threading.DispatcherPriority.Loaded);
+        UpdateDiffPositionText();
     }
 
     private void LoadDiffView()
     {
         var script = CurrentScriptConflict;
-        
+
         var vanillaText = File.Exists(script.VanillaScriptPath)
             ? Extensions.EncodingExtensions.ReadFileWithEncoding(script.VanillaScriptPath)
             : string.Empty;
@@ -89,73 +93,80 @@ public partial class DiffMergeWindow
             ? Extensions.EncodingExtensions.ReadFileWithEncoding(script.ModVersions[_selectedModIndex].ScriptPath)
             : string.Empty;
 
-        DisplayDiffInRichTextBox(LeftDiffView, vanillaText, modText, isLeft: true);
-        DisplayDiffInRichTextBox(RightDiffView, vanillaText, modText, isLeft: false);
+        _diffLinePositions = DiffRenderHelper.RenderDiff(LeftDiffView, vanillaText, modText, isLeft: true);
+        _currentDiffIndex = -1;
+        DiffRenderHelper.RenderDiff(RightDiffView, vanillaText, modText, isLeft: false);
+        UpdateDiffPositionText();
     }
 
-    private void DisplayDiffInRichTextBox(RichTextBox rtb, string leftText, string rightText, bool isLeft)
+    private void UpdateDiffPositionText()
     {
-        var diffBuilder = new SideBySideDiffBuilder(_differ);
-        var diff = diffBuilder.BuildDiffModel(leftText, rightText);
+        DiffPositionText.Text = DiffRenderHelper.FormatDiffPositionText(_diffLinePositions, _currentDiffIndex);
+    }
 
-        var document = new FlowDocument
+    private void PrevDiff_Click(object sender, RoutedEventArgs e)
+    {
+        if (_diffLinePositions.Count == 0) return;
+
+        _currentDiffIndex = _currentDiffIndex <= 0
+            ? _diffLinePositions.Count - 1
+            : _currentDiffIndex - 1;
+
+        DiffRenderHelper.ScrollToDiff(LeftDiffView, _diffLinePositions, _currentDiffIndex);
+        UpdateDiffPositionText();
+    }
+
+    private void NextDiff_Click(object sender, RoutedEventArgs e)
+    {
+        if (_diffLinePositions.Count == 0) return;
+
+        _currentDiffIndex = _currentDiffIndex >= _diffLinePositions.Count - 1
+            ? 0
+            : _currentDiffIndex + 1;
+
+        DiffRenderHelper.ScrollToDiff(LeftDiffView, _diffLinePositions, _currentDiffIndex);
+        UpdateDiffPositionText();
+    }
+
+    private void ScrollToDiffWithPadding(int diffIndex, int paddingLines = 2)
+    {
+        DiffRenderHelper.ScrollToDiff(LeftDiffView, _diffLinePositions, diffIndex, paddingLines);
+    }
+
+    private void UpdateMergeLineNumbers()
+    {
+        var lineCount = MergeResultEditor.Text.Split('\n').Length;
+        var sb = new StringBuilder();
+        for (var i = 1; i <= lineCount; i++)
+            sb.AppendLine(i.ToString());
+        MergeLineNumbers.Text = sb.ToString().TrimEnd();
+    }
+
+    private void MergeResultEditor_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateMergeLineNumbers();
+    }
+
+    private void MergeResultEditor_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        var scrollViewer = GetScrollViewer(MergeResultEditor);
+        var lineNumbersScrollViewer = GetScrollViewer(MergeLineNumbers);
+        if (scrollViewer != null && lineNumbersScrollViewer != null)
         {
-            FontFamily = new FontFamily("Consolas"),
-            FontSize = 12,
-            PageWidth = 10000
-        };
-
-        var lines = isLeft ? diff.OldText.Lines : diff.NewText.Lines;
-        var lineNumber = 1;
-
-        foreach (var line in lines)
-        {
-            var paragraph = new Paragraph
-            {
-                Margin = new Thickness(0),
-                Padding = new Thickness(0),
-                LineHeight = 1
-            };
-
-            var lineNumRun = new Run($"{lineNumber,4} ")
-            {
-                Foreground = new SolidColorBrush(Color.FromRgb(0x60, 0x60, 0x60))
-            };
-            paragraph.Inlines.Add(lineNumRun);
-
-            var contentRun = new Run(line.Text ?? string.Empty);
-
-            switch (line.Type)
-            {
-                case ChangeType.Inserted:
-                    paragraph.Background = new SolidColorBrush(Color.FromRgb(0x23, 0x42, 0x23));
-                    contentRun.Foreground = new SolidColorBrush(Color.FromRgb(0x6A, 0x99, 0x55));
-                    break;
-                case ChangeType.Deleted:
-                    paragraph.Background = new SolidColorBrush(Color.FromRgb(0x42, 0x23, 0x23));
-                    contentRun.Foreground = new SolidColorBrush(Color.FromRgb(0xCE, 0x91, 0x78));
-                    break;
-                case ChangeType.Modified:
-                    paragraph.Background = new SolidColorBrush(Color.FromRgb(0x42, 0x42, 0x23));
-                    contentRun.Foreground = new SolidColorBrush(Color.FromRgb(0xDC, 0xDC, 0xAA));
-                    break;
-                case ChangeType.Imaginary:
-                    paragraph.Background = new SolidColorBrush(Color.FromRgb(0x2D, 0x2D, 0x2D));
-                    contentRun.Foreground = new SolidColorBrush(Color.FromRgb(0x50, 0x50, 0x50));
-                    contentRun.Text = "~";
-                    break;
-                case ChangeType.Unchanged:
-                default:
-                    contentRun.Foreground = new SolidColorBrush(Color.FromRgb(0xD4, 0xD4, 0xD4));
-                    break;
-            }
-
-            paragraph.Inlines.Add(contentRun);
-            document.Blocks.Add(paragraph);
-            lineNumber++;
+            lineNumbersScrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset);
         }
+    }
 
-        rtb.Document = document;
+    private static ScrollViewer? GetScrollViewer(DependencyObject o)
+    {
+        if (o is ScrollViewer sv) return sv;
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(o); i++)
+        {
+            var child = VisualTreeHelper.GetChild(o, i);
+            var result = GetScrollViewer(child);
+            if (result != null) return result;
+        }
+        return null;
     }
 
     private void UpdateNavigationButtons()
@@ -167,7 +178,7 @@ public partial class DiffMergeWindow
     private void UpdateStatus()
     {
         var script = CurrentScriptConflict;
-        
+
         var vanillaLines = File.Exists(script.VanillaScriptPath)
             ? File.ReadAllLines(script.VanillaScriptPath).Length
             : 0;
@@ -184,7 +195,7 @@ public partial class DiffMergeWindow
     private void SaveCurrentMerge()
     {
         var content = Encoding.ANSI1250.GetBytes(MergeResultEditor.Text);
-        
+
         var existing = ResolvedConflicts.FirstOrDefault(r => r.Script == CurrentScriptConflict);
         if (existing is not null)
         {

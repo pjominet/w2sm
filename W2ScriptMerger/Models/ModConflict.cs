@@ -16,6 +16,7 @@ public class DzipConflict
 public class ModDzipSource
 {
     public required string ModName { get; init; }
+    public string DisplayName { get; init; } = string.Empty;
     public required string DzipPath { get; init; }
     public string ExtractedPath { get; set; } = string.Empty;
 }
@@ -34,6 +35,7 @@ public class ScriptFileConflict
 public class ModScriptVersion
 {
     public required string ModName { get; init; }
+    public string DisplayName { get; init; } = string.Empty;
     public required string ScriptPath { get; init; }
 }
 

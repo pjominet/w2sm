@@ -2,10 +2,11 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:W2ScriptMerger"
+             xmlns:converters="clr-namespace:W2ScriptMerger.Converters"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <local:StringToVisibilityConverter x:Key="StringToVis"/>
+        <converters:StringToVisibilityConverter x:Key="StringToVis"/>
 
         <Style x:Key="DarkButton" TargetType="Button">
             <Setter Property="Background" Value="#3C3C3C"/>

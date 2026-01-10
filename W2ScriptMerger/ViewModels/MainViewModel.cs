@@ -142,6 +142,7 @@ public partial class MainViewModel : ObservableObject
             foreach (var mod in validMods)
                 LoadedMods.Add(mod);
 
+            OnPropertyChanged(nameof(FilteredMods));
             await DetectConflictsAsync();
         });
     }
@@ -240,6 +241,7 @@ public partial class MainViewModel : ObservableObject
             if (archive.IsLoaded)
             {
                 LoadedMods.Add(archive);
+                OnPropertyChanged(nameof(FilteredMods));
                 Log($"Mod staged: {archive.DisplayName}");
             }
             else
@@ -254,6 +256,30 @@ public partial class MainViewModel : ObservableObject
 
         IsBusy = false;
         StatusMessage = $"Loaded {LoadedMods.Count} mods, {DzipConflicts.Count} conflicts detected";
+    }
+
+    [RelayCommand]
+    private void OpenModFolder(ModArchive? mod)
+    {
+        if (mod is null || string.IsNullOrEmpty(mod.StagingPath))
+            return;
+
+        if (Directory.Exists(mod.StagingPath))
+            System.Diagnostics.Process.Start("explorer.exe", mod.StagingPath);
+    }
+
+    [RelayCommand]
+    private void OpenGameFolder()
+    {
+        if (!string.IsNullOrEmpty(GamePath) && Directory.Exists(GamePath))
+            System.Diagnostics.Process.Start("explorer.exe", GamePath);
+    }
+
+    [RelayCommand]
+    private void OpenModStagingFolder()
+    {
+        if (!string.IsNullOrEmpty(ModStagingPath) && Directory.Exists(ModStagingPath))
+            System.Diagnostics.Process.Start("explorer.exe", ModStagingPath);
     }
 
     [RelayCommand]
@@ -276,6 +302,7 @@ public partial class MainViewModel : ObservableObject
                 Directory.Delete(modPath);
 
             LoadedMods.Remove(mod);
+            OnPropertyChanged(nameof(FilteredMods));
             await UpdateLoadedModsList();
             Log($"Removed: {mod.DisplayName}");
 
@@ -391,6 +418,25 @@ public partial class MainViewModel : ObservableObject
         }
 
         OpenManualMergeEditor(dzipConflict, scriptConflict);
+    }
+
+    [RelayCommand]
+    private void ViewDiff()
+    {
+        var dzipConflict = SelectedDzipConflict ?? DzipConflicts.FirstOrDefault();
+        var scriptConflict = SelectedScriptConflict ?? dzipConflict?.ScriptConflicts.FirstOrDefault();
+
+        if (dzipConflict is null || scriptConflict is null)
+        {
+            MessageBox.Show("Select a script conflict first.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var diffWindow = new Views.DiffViewerWindow(dzipConflict, scriptConflict, DzipConflicts.ToList())
+        {
+            Owner = Application.Current.MainWindow
+        };
+        diffWindow.ShowDialog();
     }
 
     private void OpenManualMergeEditor(DzipConflict dzipConflict, ScriptFileConflict scriptConflict)
