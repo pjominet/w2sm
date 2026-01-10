@@ -70,20 +70,13 @@ The manager uses three-way merge logic:
 - If changes don't overlap, they're merged automatically
 - If changes conflict (same lines modified differently), manual intervention is requested
 
-### Step 5: Choose Install Location
-
-Select where to install the merged files:
-
-- **UserContent (Documents)** - `Documents\Witcher 2\UserContent`
-  
-- **CookedPC (Game Folder)** - `<GamePath>\CookedPC`
-
-### Step 6: Install
+### Step 5: Install
 
 Click **Install Merged Files** to:
 - Copy all non-conflicting mod files to the game folder
 - Copy merged scripts for resolved conflicts to the game folder
 - The manager creates automatic backups of the original files in the game folder
+- There is an option to install all mods automatically, based on deducted mod folder structure or a manual selection of the mod folder destination if more granular control is needed
 
 ## Troubleshooting
 
