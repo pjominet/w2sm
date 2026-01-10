@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using W2ScriptMerger.Models;
+using W2ScriptMerger.Tools;
 
 namespace W2ScriptMerger.Services;
 
@@ -15,8 +16,8 @@ public class ConfigService
     {
         JsonSerializerOptions = options;
         var exeLocation = AppDomain.CurrentDomain.BaseDirectory;
-        _configPath = Path.Combine(exeLocation, "config.json");
-        _modStagingPath = Path.Combine(exeLocation, "modStaging");
+        _configPath = Path.Combine(exeLocation, Constants.CONFIG_FILENAME);
+        _modStagingPath = Path.Combine(exeLocation, Constants.STAGING_FOLDER);
         Config = Load();
     }
 

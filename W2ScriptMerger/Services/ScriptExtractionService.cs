@@ -1,5 +1,6 @@
 using System.IO;
 using W2ScriptMerger.Models;
+using W2ScriptMerger.Tools;
 
 namespace W2ScriptMerger.Services;
 
@@ -7,9 +8,9 @@ public class ScriptExtractionService(ConfigService configService)
 {
     private static string AppBasePath => AppDomain.CurrentDomain.BaseDirectory;
 
-    private static string VanillaScriptsPath => Path.Combine(AppBasePath, "vanilla_scripts");
-    private static string ModScriptsPath => Path.Combine(AppBasePath, "mod_scripts");
-    public string MergedScriptsPath => Path.Combine(configService.ModStagingPath, "merged_scripts");
+    private static string VanillaScriptsPath => Path.Combine(AppBasePath, Constants.VANILLA_SCRIPTS_FOLDER);
+    private static string ModScriptsPath => Path.Combine(AppBasePath, Constants.MOD_SCRIPTS_FOLDER);
+    public string MergedScriptsPath => Path.Combine(configService.ModStagingPath, Constants.MERGED_SCRIPTS_FOLDER);
 
     private readonly Dictionary<string, string> _vanillaDzipIndex = new(StringComparer.OrdinalIgnoreCase);
 
@@ -78,7 +79,7 @@ public class ScriptExtractionService(ConfigService configService)
     {
         EnsureMergedScriptsFolder();
 
-        var manifestPath = Path.Combine(MergedScriptsPath, "MERGED_MODS.md");
+        var manifestPath = Path.Combine(MergedScriptsPath, Constants.MERGE_SUMMARY_FILENAME);
         var lines = new List<string>
         {
             "# Merged Mods",
@@ -95,8 +96,7 @@ public class ScriptExtractionService(ConfigService configService)
             .Distinct()
             .OrderBy(n => n);
 
-        foreach (var modName in modNames)
-            lines.Add($"- {modName}");
+        lines.AddRange(modNames.Select(modName => $"- {modName}"));
 
         lines.Add("");
         lines.Add("## Merged Scripts");
@@ -163,7 +163,7 @@ public class ScriptExtractionService(ConfigService configService)
         if (!Directory.Exists(sourceDir))
             return;
 
-        var outputPath = Path.Combine(MergedScriptsPath, dzipName + ".dzip.tmp");
+        var outputPath = Path.Combine(MergedScriptsPath, $"{dzipName}.dzip.tmp");
         var finalPath = Path.Combine(MergedScriptsPath, dzipName);
 
         if (File.Exists(outputPath))

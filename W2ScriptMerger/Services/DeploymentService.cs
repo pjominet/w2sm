@@ -1,14 +1,12 @@
 using System.IO;
 using System.Text.Json;
 using W2ScriptMerger.Models;
+using W2ScriptMerger.Tools;
 
 namespace W2ScriptMerger.Services;
 
 internal class DeploymentService(ConfigService configService, ScriptExtractionService extractionService)
 {
-    private const string BackupExtension = ".smbk";
-    private const string ManifestFileName = "w2scriptmerger_deployment.json";
-
     private class DeploymentManifest
     {
         public DateTime DeployedAt { get; set; }
@@ -113,7 +111,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
             RestoreBackup(filePath);
         }
 
-        var manifestPath = Path.Combine(targetBasePath, ManifestFileName);
+        var manifestPath = Path.Combine(targetBasePath, Constants.DEPLOY_MANIFEST_FILENAME);
         if (File.Exists(manifestPath))
             File.Delete(manifestPath);
     }
@@ -154,7 +152,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         if (!File.Exists(filePath))
             return false;
 
-        var backupPath = filePath + BackupExtension;
+        var backupPath = filePath + Constants.BACKUP_FILE_EXTENSION;
 
         if (File.Exists(backupPath))
             return false;
@@ -165,7 +163,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
     private static DeploymentManifest LoadOrCreateManifest(string targetBasePath)
     {
-        var manifestPath = Path.Combine(targetBasePath, ManifestFileName);
+        var manifestPath = Path.Combine(targetBasePath, Constants.DEPLOY_MANIFEST_FILENAME);
         if (!File.Exists(manifestPath))
             return new DeploymentManifest();
 
@@ -182,14 +180,14 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
     private void SaveManifest(string targetBasePath, DeploymentManifest manifest)
     {
-        var manifestPath = Path.Combine(targetBasePath, ManifestFileName);
+        var manifestPath = Path.Combine(targetBasePath, Constants.DEPLOY_MANIFEST_FILENAME);
         var json = JsonSerializer.Serialize(manifest, configService.JsonSerializerOptions);
         File.WriteAllText(manifestPath, json);
     }
 
     private static void RestoreBackup(string filePath)
     {
-        var backupPath = filePath + BackupExtension;
+        var backupPath = filePath + Constants.BACKUP_FILE_EXTENSION;
 
         if (!File.Exists(backupPath))
             return;
@@ -205,11 +203,11 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         if (string.IsNullOrEmpty(directoryPath) || !Directory.Exists(directoryPath))
             return;
 
-        var backupFiles = Directory.GetFiles(directoryPath, "*" + BackupExtension, SearchOption.AllDirectories);
+        var backupFiles = Directory.GetFiles(directoryPath, $"*{Constants.BACKUP_FILE_EXTENSION}", SearchOption.AllDirectories);
 
         foreach (var backupPath in backupFiles)
         {
-            var originalPath = backupPath[..^BackupExtension.Length];
+            var originalPath = backupPath[..^Constants.BACKUP_FILE_EXTENSION.Length];
 
             if (File.Exists(originalPath))
                 File.Delete(originalPath);

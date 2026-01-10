@@ -23,7 +23,7 @@ public partial class MainViewModel : ObservableObject
     private readonly DeploymentService _deploymentService;
     private readonly LoggingService _loggingService;
 
-    private static string ModsListPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "loadedMods.json");
+    private static string ModsListPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Constants.STAGING_LIST_FILENAME);
 
     private readonly JsonSerializerOptions _jsonSerializerOptions = new()
     {
@@ -212,7 +212,7 @@ public partial class MainViewModel : ObservableObject
 
     private void ShowMergeSummary(int autoMergedCount, int manualMergedCount)
     {
-        var mergedModsPath = Path.Combine(_extractionService.MergedScriptsPath, "MERGE_SUMMARY.md");
+        var mergedModsPath = Path.Combine(_extractionService.MergedScriptsPath, Constants.MERGE_SUMMARY_FILENAME);
         var dialog = new MergeSummaryDialog(mergedModsPath, autoMergedCount, manualMergedCount)
         {
             Owner = Application.Current.MainWindow
