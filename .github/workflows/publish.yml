@@ -58,6 +58,8 @@ jobs:
           -p:PublishReadyToRun=true `
           -p:IncludeNativeLibrariesForSelfExtract=true `
           -p:IncludeAllContentForSelfExtract=true `
+          -p:DebugType=none `
+          -p:DebugSymbols=false `
           --output ./publish
 
     - name: Zip release
