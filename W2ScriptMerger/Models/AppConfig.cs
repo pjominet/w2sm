@@ -4,7 +4,7 @@ namespace W2ScriptMerger.Models;
 internal class AppConfig
 {
     public string? GamePath { get; set; }
-    public string? ModStagingPath { get; set; }
+    public string? RuntimeDataPath { get; set; }
     public string? UserContentPath { get; set; }
     public string? LastModDirectory { get; set; }
     public bool PromptForUnknownInstallLocation { get; set; }

@@ -20,7 +20,7 @@ public class ArchiveServiceTests
         var options = new JsonSerializerOptions { WriteIndented = true };
         var configService = new ConfigService(options)
         {
-            ModStagingPath = _tempPath
+            RuntimeDataPath = _tempPath
         };
         _archiveService = new ArchiveService(configService);
     }

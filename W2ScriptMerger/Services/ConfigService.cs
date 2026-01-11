@@ -8,16 +8,14 @@ namespace W2ScriptMerger.Services;
 // ReSharper disable InconsistentNaming
 public class ConfigService
 {
+    private static string ExeLocation => AppDomain.CurrentDomain.BaseDirectory;
     private readonly string _configPath;
-    private readonly string _modStagingPath;
     private AppConfig Config { get; }
 
     public ConfigService(JsonSerializerOptions options)
     {
         JsonSerializerOptions = options;
-        var exeLocation = AppDomain.CurrentDomain.BaseDirectory;
-        _configPath = Path.Combine(exeLocation, Constants.CONFIG_FILENAME);
-        _modStagingPath = Path.Combine(exeLocation, Constants.STAGING_FOLDER);
+        _configPath = Path.Combine(ExeLocation, Constants.CONFIG_FILENAME);
         Config = Load();
     }
 
@@ -33,13 +31,65 @@ public class ConfigService
         }
     }
 
-    public string ModStagingPath
+    public string RuntimeDataPath
     {
-        get => _modStagingPath;
+        get => string.IsNullOrEmpty(Config.RuntimeDataPath) ? ExeLocation : Config.RuntimeDataPath;
         set
         {
-            Config.ModStagingPath = value;
+            Config.RuntimeDataPath = value;
             Save();
+        }
+    }
+
+    public string ModStagingPath => Path.Combine(RuntimeDataPath, Constants.STAGING_FOLDER);
+    public string VanillaScriptsPath => Path.Combine(RuntimeDataPath, Constants.VANILLA_SCRIPTS_FOLDER);
+    public string ModScriptsPath => Path.Combine(RuntimeDataPath, Constants.MOD_SCRIPTS_FOLDER);
+
+    private static string[] RuntimeFolders =>
+    [
+        Constants.STAGING_FOLDER,
+        Constants.VANILLA_SCRIPTS_FOLDER,
+        Constants.MOD_SCRIPTS_FOLDER
+    ];
+
+    public void MigrateRuntimeData(string newPath)
+    {
+        var oldPath = RuntimeDataPath;
+        if (string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        foreach (var folder in RuntimeFolders)
+        {
+            var sourceDir = Path.Combine(oldPath, folder);
+            var destDir = Path.Combine(newPath, folder);
+
+            if (!Directory.Exists(sourceDir))
+                continue;
+
+            if (Directory.Exists(destDir))
+                Directory.Delete(destDir, true);
+
+            CopyDirectory(sourceDir, destDir);
+            Directory.Delete(sourceDir, true);
+        }
+
+        RuntimeDataPath = newPath;
+    }
+
+    private static void CopyDirectory(string sourceDir, string destDir)
+    {
+        Directory.CreateDirectory(destDir);
+
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var destFile = Path.Combine(destDir, Path.GetFileName(file));
+            File.Copy(file, destFile, overwrite: true);
+        }
+
+        foreach (var dir in Directory.GetDirectories(sourceDir))
+        {
+            var destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
+            CopyDirectory(dir, destSubDir);
         }
     }
 
@@ -50,8 +100,8 @@ public class ConfigService
             if (!string.IsNullOrEmpty(Config.UserContentPath))
                 return Config.UserContentPath;
 
-            var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            return Path.Combine(docs, "Witcher 2", "UserContent");
+            var myDocuments = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            return Path.Combine(myDocuments, "Witcher 2", "UserContent");
         }
         set
         {

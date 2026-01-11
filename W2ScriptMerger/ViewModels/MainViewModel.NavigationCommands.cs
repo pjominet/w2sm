@@ -36,19 +36,42 @@ public partial class MainViewModel
     }
 
     [RelayCommand]
-    private void BrowseModStagingPath()
+    private async Task BrowseRuntimeDataPath()
     {
         var dialog = new OpenFolderDialog
         {
-            Title = "Select your Witcher 2 Mod Staging Folder"
+            Title = "Select folder for data (mods, scripts, etc.)"
         };
 
         if (dialog.ShowDialog() != true)
             return;
 
-        ModStagingPath = dialog.FolderName;
-        _configService.ModStagingPath = ModStagingPath;
-        Log($"Mod staging path set: {ModStagingPath}");
+        var newPath = dialog.FolderName;
+        var oldPath = RuntimeDataPath;
+
+        if (string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        try
+        {
+            IsBusy = true;
+            StatusMessage = "Migrating data...";
+
+            await Task.Run(() => _configService.MigrateRuntimeData(newPath));
+
+            RuntimeDataPath = _configService.RuntimeDataPath;
+            Log($"Data path changed: {RuntimeDataPath}");
+            StatusMessage = "Data migrated successfully";
+        }
+        catch (Exception ex)
+        {
+            Log($"Error migrating data: {ex.Message}");
+            StatusMessage = "Migration failed";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand]
@@ -69,9 +92,9 @@ public partial class MainViewModel
     }
 
     [RelayCommand]
-    private void OpenModStagingFolder()
+    private void OpenRuntimeDataFolder()
     {
-        if (!string.IsNullOrEmpty(ModStagingPath) && Directory.Exists(ModStagingPath))
-            System.Diagnostics.Process.Start("explorer.exe", ModStagingPath);
+        if (!string.IsNullOrEmpty(RuntimeDataPath) && Directory.Exists(RuntimeDataPath))
+            System.Diagnostics.Process.Start("explorer.exe", RuntimeDataPath);
     }
 }

@@ -22,7 +22,7 @@ public partial class MainViewModel : ObservableObject
 
     private static string ModsListPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Constants.STAGING_LIST_FILENAME);
 
-    public static string AppVersion => Assembly.GetExecutingAssembly()
+    private static string AppVersion => Assembly.GetExecutingAssembly()
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0";
 
     public string WindowTitle => $"Witcher 2 Mod Manager v{AppVersion}";
@@ -33,7 +33,7 @@ public partial class MainViewModel : ObservableObject
     };
 
     [ObservableProperty] private string _gamePath = string.Empty;
-    [ObservableProperty] private string _modStagingPath = string.Empty;
+    [ObservableProperty] private string _runtimeDataPath = string.Empty;
     [ObservableProperty] private string _userContentPath = string.Empty;
     [ObservableProperty] private bool _isGamePathValid;
     [ObservableProperty] private string _statusMessage = "Ready";
@@ -76,7 +76,7 @@ public partial class MainViewModel : ObservableObject
         _deploymentService = new DeploymentService(_configService, _extractionService);
 
         GamePath = _configService.GamePath ?? string.Empty;
-        ModStagingPath = _configService.ModStagingPath;
+        RuntimeDataPath = _configService.RuntimeDataPath;
         UserContentPath = _configService.UserContentPath;
         IsGamePathValid = _configService.IsGamePathValid();
         PromptForUnknownInstallLocation = _configService.PromptForUnknownInstallLocation;

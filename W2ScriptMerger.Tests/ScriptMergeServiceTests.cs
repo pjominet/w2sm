@@ -71,7 +71,7 @@ public class ScriptMergeServiceTests
         };
         var configService = new ConfigService(options)
         {
-            ModStagingPath = _tempPath
+            RuntimeDataPath = _tempPath
         };
         var vanillaIndexService = new IndexerService(configService);
         var extractionService = new ScriptExtractionService(configService, vanillaIndexService);
@@ -123,7 +123,7 @@ public class ScriptMergeServiceTests
         };
         var configService = new ConfigService(options)
         {
-            ModStagingPath = _tempPath
+            RuntimeDataPath = _tempPath
         };
         var vanillaIndexService = new IndexerService(configService);
         var extractionService = new ScriptExtractionService(configService, vanillaIndexService);

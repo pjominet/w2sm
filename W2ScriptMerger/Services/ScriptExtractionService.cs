@@ -6,10 +6,8 @@ namespace W2ScriptMerger.Services;
 
 public class ScriptExtractionService(ConfigService configService, IndexerService indexerService)
 {
-    private static string AppBasePath => AppDomain.CurrentDomain.BaseDirectory;
-
-    private static string VanillaScriptsPath => Path.Combine(AppBasePath, Constants.VANILLA_SCRIPTS_FOLDER);
-    private static string ModScriptsPath => Path.Combine(AppBasePath, Constants.MOD_SCRIPTS_FOLDER);
+    private string VanillaScriptsPath => configService.VanillaScriptsPath;
+    private string ModScriptsPath => configService.ModScriptsPath;
     public string MergedScriptsPath => Path.Combine(configService.ModStagingPath, Constants.MERGED_SCRIPTS_FOLDER);
 
     private readonly Dictionary<string, string> _vanillaDzipIndex = new(StringComparer.OrdinalIgnoreCase);
