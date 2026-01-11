@@ -6,8 +6,8 @@
         xmlns:vm="clr-namespace:W2ScriptMerger.ViewModels"
         mc:Ignorable="d"
         Title="{Binding WindowTitle}"
-        Height="800" Width="1200"
-        MinHeight="650" MinWidth="1000"
+        Height="1000" Width="1000"
+        MinHeight="650" MinWidth="900"
         WindowStartupLocation="CenterScreen"
         Background="#1E1E1E">
 
@@ -50,7 +50,7 @@
         <!-- Main Content -->
         <Grid Grid.Row="1" Margin="15">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="400"/>
                 <ColumnDefinition Width="10"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
@@ -232,19 +232,6 @@
                     <Button Content="📋 View Merge Summary" Command="{Binding ViewMergeSummaryCommand}" Style="{StaticResource SuccessButton}"
                             Visibility="{Binding HasExistingMerge, Converter={StaticResource BoolToVis}}" Margin="0,0,8,0"/>
                 </StackPanel>
-
-                <!-- Diff Preview -->
-                <TextBox Grid.Row="3" Text="{Binding DiffViewText, Mode=OneWay}"
-                         Style="{StaticResource DarkTextBox}"
-                         IsReadOnly="True"
-                         FontFamily="Consolas"
-                         FontSize="11"
-                         Height="150"
-                         VerticalScrollBarVisibility="Auto"
-                         HorizontalScrollBarVisibility="Auto"
-                         TextWrapping="NoWrap"
-                         AcceptsReturn="True"
-                         Visibility="{Binding DiffViewText, Converter={StaticResource StringToVis}}"/>
 
                 <!-- Log Header -->
                 <TextBlock Grid.Row="4" Text="Log" FontSize="12" Foreground="#888888" Margin="0,10,0,5" VerticalAlignment="Top"/>

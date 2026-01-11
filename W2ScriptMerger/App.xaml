@@ -7,7 +7,6 @@
     <Application.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
-        <converters:StringToVisibilityConverter x:Key="StringToVis"/>
 
         <!-- Global ToolTip Style -->
         <Style TargetType="ToolTip">

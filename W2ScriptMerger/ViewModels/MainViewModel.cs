@@ -40,7 +40,6 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private DzipConflict? _selectedDzipConflict;
     [ObservableProperty] private ScriptFileConflict? _selectedScriptConflict;
-    [ObservableProperty] private string _diffViewText = string.Empty;
     [ObservableProperty] private string _logText = string.Empty;
     [ObservableProperty] private bool _hasPendingMergeChanges;
     [ObservableProperty] private bool _hasExistingMerge;
