@@ -37,7 +37,7 @@ public partial class MainViewModel
                     ? $", {_indexerService.ModDzipCount} mod dzips"
                     : "";
                 Log($"Indexed {_indexerService.VanillaDzipCount} vanilla dzips{modDzipMsg}");
-                StatusMessage = "Ready - Scripts indexed";
+                StatusMessage = "Ready - Files indexed";
             });
         });
     }

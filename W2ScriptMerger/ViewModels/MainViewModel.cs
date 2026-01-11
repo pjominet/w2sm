@@ -23,7 +23,7 @@ public partial class MainViewModel : ObservableObject
     private static string ModsListPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Constants.STAGING_LIST_FILENAME);
 
     private static string AppVersion => Assembly.GetExecutingAssembly()
-        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0";
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
 
     public string WindowTitle => $"Witcher 2 Mod Manager v{AppVersion}";
 
@@ -86,7 +86,7 @@ public partial class MainViewModel : ObservableObject
         if (!IsGamePathValid)
             return;
 
-        Log("Game path validated. Extracting vanilla scripts...");
+        Log("Game path validated. Indexing vanilla files...");
         Task.Run(async () =>
         {
             await ExtractVanillaScripts();
