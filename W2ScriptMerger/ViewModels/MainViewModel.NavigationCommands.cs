@@ -1,76 +1,69 @@
 using System.IO;
+using System.Windows;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Win32;
 using W2ScriptMerger.Models;
+using W2ScriptMerger.Views;
 
 namespace W2ScriptMerger.ViewModels;
 
 public partial class MainViewModel
 {
     [RelayCommand]
-    private async Task BrowseGamePath()
+    private async Task OpenSettings()
     {
-        var dialog = new OpenFolderDialog
+        var dialog = new SettingsDialog(GamePath, RuntimeDataPath)
         {
-            Title = "Select your Witcher 2 Installation Folder"
+            Owner = Application.Current.MainWindow
         };
 
         if (dialog.ShowDialog() != true)
             return;
 
-        GamePath = dialog.FolderName;
-        _configService.GamePath = GamePath;
-        IsGamePathValid = _configService.IsGamePathValid();
-
-        if (IsGamePathValid)
+        // Handle game path change
+        if (dialog.GamePathChanged)
         {
-            Log($"Game path set: {GamePath}");
-            UserContentPath = _configService.UserContentPath;
-            await ExtractVanillaScripts();
+            GamePath = dialog.GamePath;
+            _configService.GamePath = GamePath;
+            IsGamePathValid = _configService.IsGamePathValid();
+
+            if (IsGamePathValid)
+            {
+                Log($"Game path set: {GamePath}");
+                UserContentPath = _configService.UserContentPath;
+                await ExtractVanillaScripts();
+                await DetectStagedMods();
+            }
+            else
+            {
+                Log("Warning: Selected path does not appear to be a valid Witcher 2 installation");
+                StatusMessage = "Invalid game path";
+            }
         }
-        else
+
+        // Handle data path change
+        if (dialog.DataPathChanged)
         {
-            Log("Warning: Selected path does not appear to be a valid Witcher 2 installation");
-            StatusMessage = "Invalid game path";
-        }
-    }
+            var newPath = dialog.DataPath;
+            try
+            {
+                IsBusy = true;
+                StatusMessage = "Migrating data...";
 
-    [RelayCommand]
-    private async Task BrowseRuntimeDataPath()
-    {
-        var dialog = new OpenFolderDialog
-        {
-            Title = "Select folder for data (mods, scripts, etc.)"
-        };
+                await Task.Run(() => _configService.MigrateRuntimeData(newPath));
 
-        if (dialog.ShowDialog() != true)
-            return;
-
-        var newPath = dialog.FolderName;
-        var oldPath = RuntimeDataPath;
-
-        if (string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
-            return;
-
-        try
-        {
-            IsBusy = true;
-            StatusMessage = "Migrating data...";
-
-            await Task.Run(() => _configService.MigrateRuntimeData(newPath));
-
-            RuntimeDataPath = _configService.RuntimeDataPath;
-            Log($"Data path changed: {RuntimeDataPath}");
-            StatusMessage = "Data migrated successfully";
-        }
-        catch (Exception ex)
-        {
-            Log($"Error migrating data: {ex.Message}");
-            StatusMessage = "Migration failed";
-        }
-        finally
-        {
-            IsBusy = false;
+                RuntimeDataPath = _configService.RuntimeDataPath;
+                Log($"Data path changed: {RuntimeDataPath}");
+                StatusMessage = "Data migrated successfully";
+            }
+            catch (Exception ex)
+            {
+                Log($"Error migrating data: {ex.Message}");
+                StatusMessage = "Migration failed";
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
     }
 

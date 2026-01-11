@@ -46,7 +46,10 @@ public partial class MainViewModel
     {
         Log("Detecting staged mods...");
         if (!File.Exists(ModsListPath))
+        {
+            Log("No mods yet");
             return;
+        }
 
         var json = await File.ReadAllTextAsync(ModsListPath);
         var mods = JsonSerializer.Deserialize<List<ModArchive>>(json);
