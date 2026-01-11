@@ -10,14 +10,14 @@
         <Description>A mod manager and script merger for The Witcher 2</Description>
         <!-- Many thanks to https://www.iconarchive.com/show/papirus-apps-icons-by-papirus-team/the-witcher-2-icon.html -->
         <ApplicationIcon>Assets\w2sm.ico</ApplicationIcon>
-        
+
         <!-- Versioning -->
-        <Version>1.0.0</Version>
-        <AssemblyVersion>1.0.0.0</AssemblyVersion>
-        <FileVersion>1.0.0.0</FileVersion>
-        <InformationalVersion>1.0.0</InformationalVersion>
+        <Version>1.0.1</Version>
+        <AssemblyVersion>1.0.1.0</AssemblyVersion>
+        <FileVersion>1.0.1.0</FileVersion>
+        <InformationalVersion>1.0.1</InformationalVersion>
         <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-        
+
         <!-- Output -->
         <AssemblyName>w2sm</AssemblyName>
     </PropertyGroup>
