@@ -92,7 +92,7 @@ Make sure you selected the main Witcher 2 folder, not a subfolder. The folder sh
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License - Non-Commercial** - see the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
