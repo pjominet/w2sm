@@ -8,14 +8,13 @@ namespace W2ScriptMerger.Services;
 // ReSharper disable InconsistentNaming
 public class ConfigService
 {
-    private static string ExeLocation => AppDomain.CurrentDomain.BaseDirectory;
     private readonly string _configPath;
     private AppConfig Config { get; }
 
     public ConfigService(JsonSerializerOptions options)
     {
         JsonSerializerOptions = options;
-        _configPath = Path.Combine(ExeLocation, Constants.CONFIG_FILENAME);
+        _configPath = Path.Combine(Constants.APP_BASE_PATH, Constants.CONFIG_FILENAME);
         Config = Load();
     }
 
@@ -33,7 +32,7 @@ public class ConfigService
 
     public string RuntimeDataPath
     {
-        get => string.IsNullOrEmpty(Config.RuntimeDataPath) ? ExeLocation : Config.RuntimeDataPath;
+        get => string.IsNullOrEmpty(Config.RuntimeDataPath) ? Constants.APP_BASE_PATH : Config.RuntimeDataPath;
         set
         {
             Config.RuntimeDataPath = value;

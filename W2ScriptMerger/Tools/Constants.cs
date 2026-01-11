@@ -1,8 +1,13 @@
+using System.IO;
+
 namespace W2ScriptMerger.Tools;
 
 // ReSharper disable InconsistentNaming
 internal static class Constants
 {
+    // paths
+    internal static string APP_BASE_PATH => Path.GetDirectoryName(Environment.ProcessPath) ?? AppDomain.CurrentDomain.BaseDirectory;
+
     // files names
     internal const string MERGE_SUMMARY_FILENAME = "merge_summary.md";
     internal const string STAGING_LIST_FILENAME = "loaded_mods.json";

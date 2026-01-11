@@ -6,8 +6,7 @@ namespace W2ScriptMerger.Services;
 
 public class IndexerService(ConfigService configService)
 {
-    private static string AppBasePath => AppDomain.CurrentDomain.BaseDirectory;
-    private static string VanillaFilesIndexPath => Path.Combine(AppBasePath, Constants.VANILLA_FILES_INDEX_FILENAME);
+    private static string VanillaFilesIndexPath => Path.Combine(Constants.APP_BASE_PATH, Constants.VANILLA_FILES_INDEX_FILENAME);
 
     private readonly HashSet<string> _vanillaFiles = new(StringComparer.OrdinalIgnoreCase);
 

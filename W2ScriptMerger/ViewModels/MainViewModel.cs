@@ -20,7 +20,7 @@ public partial class MainViewModel : ObservableObject
     private readonly DeploymentService _deploymentService;
     private readonly LoggingService _loggingService;
 
-    private static string ModsListPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Constants.STAGING_LIST_FILENAME);
+    private static string ModsListPath => Path.Combine(Constants.APP_BASE_PATH, Constants.STAGING_LIST_FILENAME);
 
     private static string AppVersion => Assembly.GetExecutingAssembly()
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
