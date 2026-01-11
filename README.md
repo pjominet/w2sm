@@ -1,4 +1,4 @@
-# Witcher 2 Script Merger
+# Witcher 2 Script Merger & Mod Manager
 
 A script merger and mod manager for **The Witcher 2: Assassins of Kings**, inspired by the popular [Script Merger for The Witcher 3](https://www.nexusmods.com/witcher3/mods/484).
 
