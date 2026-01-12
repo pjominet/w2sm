@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.ViewModels;
 
@@ -32,6 +33,12 @@ public partial class MainWindow
         {
             MessageBox.Show($"Error opening settings: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void LogTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (sender is TextBox textBox)
+            textBox.ScrollToEnd();
     }
 
     private void ConflictTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
