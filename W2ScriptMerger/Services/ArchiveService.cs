@@ -1,5 +1,5 @@
 using System.IO;
-using SharpCompress.Archives;
+using SharpSevenZip;
 using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 
@@ -20,14 +20,36 @@ public class ArchiveService(ConfigService configService)
             modArchive.StagingPath = Path.Combine(configService.ModStagingPath, modArchive.ModName);
             Directory.CreateDirectory(modArchive.StagingPath);
 
-            using (var archive = ArchiveFactory.Open(archivePath))
-            {
-                // Collect entries to process
-                var entriesToProcess = archive.Entries.Where(e => !e.IsDirectory).ToList();
+            // Create a temporary extraction directory
+            var tempExtractPath = Path.Combine(Path.GetTempPath(), $"w2sm_extract_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempExtractPath);
 
-                // Process entries concurrently
-                var tasks = entriesToProcess.Select(entry => ProcessEntryAsync(entry, modArchive, ctx ?? CancellationToken.None));
-                await Task.WhenAll(tasks);
+            try
+            {
+                // Extract all files in one batch call with 7z native bulk extraction
+                using (var extractor = new SharpSevenZipExtractor(archivePath))
+                {
+                    await Task.Run(() => extractor.ExtractArchive(tempExtractPath), ctx ?? CancellationToken.None);
+                }
+
+                // Parallel file processing
+                var extractedFiles = Directory.EnumerateFiles(tempExtractPath, "*", SearchOption.AllDirectories);
+                var token = ctx ?? CancellationToken.None;
+
+                await Parallel.ForEachAsync(extractedFiles, new ParallelOptions
+                {
+                    CancellationToken = token,
+                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                }, async (extractedFilePath, ct) =>
+                {
+                    var relativeArchivePath = Path.GetRelativePath(tempExtractPath, extractedFilePath).Replace('\\', '/');
+                    await ProcessExtractedFileAsync(relativeArchivePath, extractedFilePath, modArchive, ct);
+                });
+            }
+            finally
+            {
+                // Cleanup temp directory
+                try { Directory.Delete(tempExtractPath, recursive: true); } catch { /* ignore cleanup errors */ }
             }
 
             modArchive.IsLoaded = true;
@@ -41,9 +63,9 @@ public class ArchiveService(ConfigService configService)
         return modArchive;
     }
 
-    private static async Task ProcessEntryAsync(IArchiveEntry entry, ModArchive modArchive, CancellationToken ctx)
+    private static async Task ProcessExtractedFileAsync(string archiveRelativePath, string extractedFilePath, ModArchive modArchive, CancellationToken ctx)
     {
-        var normalizedPath = DetermineRelativeModFilePath(entry.Key);
+        var normalizedPath = DetermineRelativeModFilePath(archiveRelativePath);
 
         // ignore empty entries
         if (!normalizedPath.HasValue())
@@ -56,18 +78,18 @@ public class ArchiveService(ConfigService configService)
         string fileStagingPath;
         if (normalizedPath.StartsWith("CookedPC/", StringComparison.OrdinalIgnoreCase))
         {
-            modArchive.ModInstallLocation = InstallLocation.CookedPC;
+            lock (modArchive) { modArchive.ModInstallLocation = InstallLocation.CookedPC; }
             fileStagingPath = normalizedPath;
         }
         else if (normalizedPath.StartsWith("UserContent/", StringComparison.OrdinalIgnoreCase))
         {
-            modArchive.ModInstallLocation = InstallLocation.UserContent;
+            lock (modArchive) { modArchive.ModInstallLocation = InstallLocation.UserContent; }
             fileStagingPath = normalizedPath;
         }
         else
         {
             // Mark as Unknown - will be resolved during deployment based on user preference
-            modArchive.ModInstallLocation = InstallLocation.Unknown;
+            lock (modArchive) { modArchive.ModInstallLocation = InstallLocation.Unknown; }
             fileStagingPath = $"CookedPC/{normalizedPath}"; // Stage to CookedPC by default
         }
 
@@ -81,30 +103,23 @@ public class ArchiveService(ConfigService configService)
         };
         var shouldStoreContent = type is ModFileType.Dzip or ModFileType.Xml or ModFileType.Strings;
 
-        await using var entryStream = await entry.OpenEntryStreamAsync(ctx);
-
-        // Extract to file
+        // Copy to staging path
         var stagingPath = Path.Combine(modArchive.StagingPath, fileStagingPath);
         Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);
 
         byte[]? content = null;
         if (shouldStoreContent)
         {
-            using var ms = new MemoryStream();
-            await entryStream.CopyToAsync(ms, ctx);
-            ms.Position = 0;
-
-            await using (var fileStream = File.Create(stagingPath))
-            {
-                await ms.CopyToAsync(fileStream, ctx);
-            }
-
-            content = ms.ToArray();
+            // Read content into memory and write to staging
+            content = await File.ReadAllBytesAsync(extractedFilePath, ctx);
+            await File.WriteAllBytesAsync(stagingPath, content, ctx);
         }
         else
         {
-            await using var fileStream = File.Create(stagingPath);
-            await entryStream.CopyToAsync(fileStream, ctx);
+            // Stream copy for large files we don't need in memory
+            await using var source = new FileStream(extractedFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 81920, useAsync: true);
+            await using var dest = new FileStream(stagingPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920, useAsync: true);
+            await source.CopyToAsync(dest, ctx);
         }
 
         // Create ModFile reference

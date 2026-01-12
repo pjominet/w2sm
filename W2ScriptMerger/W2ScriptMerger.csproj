@@ -10,28 +10,32 @@
         <Description>A mod manager and script merger for The Witcher 2</Description>
         <!-- Many thanks to https://www.iconarchive.com/show/papirus-apps-icons-by-papirus-team/the-witcher-2-icon.html -->
         <ApplicationIcon>Assets\w2sm.ico</ApplicationIcon>
+        <AssemblyName>w2sm</AssemblyName>
 
         <!-- Versioning -->
         <Version>1.0.2</Version>
         <AssemblyVersion>1.0.2.0</AssemblyVersion>
         <FileVersion>1.0.2.0</FileVersion>
         <InformationalVersion>1.0.2</InformationalVersion>
-        <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-
-        <!-- Output -->
-        <AssemblyName>w2sm</AssemblyName>
+        <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>       
+        
+        <!-- Exclude SharpSevenZip native assemblies -->
+        <ExcludeSevenZipAssemblies>true</ExcludeSevenZipAssemblies>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-        <PackageReference Include="SharpCompress" Version="0.44.0" />
         <PackageReference Include="DiffPlex" Version="1.9.0" />
+        <PackageReference Include="SharpSevenZip" Version="2.0.35" ExcludeAssets="native" />
     </ItemGroup>
 
     <ItemGroup>
         <None Remove="Assets\**" />
         <Content Include="Assets\w2sm.ico">
             <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+        </Content>
+        <Content Include="Dependencies\7z.dll">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </Content>
     </ItemGroup>
 
