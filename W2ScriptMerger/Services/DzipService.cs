@@ -78,6 +78,16 @@ public static class DzipService
     /// </summary>
     /// <param name="dzipPath">Path to the DZIP archive to extract</param>
     /// <param name="outputDirectoryBase">Absolute path to extract to</param>
+    /// <param name="ctx">Cancellation token</param>
+    /// <returns>Full path to the extracted directory</returns>
+    public static Task<string> UnpackDzipToAsync(string dzipPath, string outputDirectoryBase, CancellationToken ctx = default)
+        => Task.Run(() => UnpackDzipTo(dzipPath, outputDirectoryBase), ctx);
+
+    /// <summary>
+    /// Extracts every entry in the archive to a specified absolute path, preserving timestamps.
+    /// </summary>
+    /// <param name="dzipPath">Path to the DZIP archive to extract</param>
+    /// <param name="outputDirectoryBase">Absolute path to extract to</param>
     /// <returns>Full path to the extracted directory</returns>
     public static string UnpackDzipTo(string dzipPath, string outputDirectoryBase)
     {
@@ -120,9 +130,9 @@ public static class DzipService
         // Block-based LZF decompression (64KB blocks)
         const int blockSize = 0x10000; // 64KB
         var blockCount = (int)((entry.ExpectedUncompressedSize + blockSize - 1) / blockSize);
-        
+
         using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true);
-        
+
         // Read block offset table (blockCount + 1 entries, each is uint32 relative to entry.Offset)
         var offsets = new long[blockCount + 1];
         for (var i = 0; i <= blockCount; i++)
@@ -141,12 +151,12 @@ public static class DzipService
         {
             var blockCompressedSize = (int)(offsets[i + 1] - offsets[i]);
             var compressedBlock = new byte[blockCompressedSize];
-            
+
             stream.Seek(offsets[i], SeekOrigin.Begin);
             stream.ReadExactly(compressedBlock, 0, blockCompressedSize);
 
             var decompressedSize = Lzf.Decompress(compressedBlock, uncompressedBlock);
-            
+
             var bytesToCopy = (int)Math.Min(remaining, decompressedSize);
             Array.Copy(uncompressedBlock, 0, output, outputPosition, bytesToCopy);
             outputPosition += bytesToCopy;
@@ -181,7 +191,7 @@ public static class DzipService
 
             var offset = stream.Position;
             var blockCount = (fileData.Length + blockSize - 1) / blockSize;
-            
+
             // Reserve space for offset table
             var offsetTablePosition = stream.Position;
             for (var i = 0; i <= blockCount; i++)
@@ -192,16 +202,16 @@ public static class DzipService
             for (var i = 0; i < blockCount; i++)
             {
                 blockOffsets.Add((uint)(stream.Position - offset));
-                
+
                 var blockStart = i * blockSize;
                 var blockLength = Math.Min(blockSize, fileData.Length - blockStart);
                 var blockData = new byte[blockLength];
                 Array.Copy(fileData, blockStart, blockData, 0, blockLength);
-                
+
                 var compressedBlock = Lzf.Compress(blockData);
                 stream.Write(compressedBlock, 0, compressedBlock.Length);
             }
-            
+
             var compressedSize = stream.Position - offset;
 
             // Go back and write the actual offsets

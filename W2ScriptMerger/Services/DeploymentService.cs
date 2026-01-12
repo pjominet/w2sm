@@ -13,15 +13,17 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         public List<string> ManagedFiles { get; init; } = [];
     }
 
-    public void DeployMod(ModArchive mod, HashSet<string> mergedDzipNames)
+    public void DeployMod(ModArchive mod, HashSet<string> mergedDzipNames, CancellationToken ctx = default)
     {
         var targetBasePath = GetTargetPath(mod.ModInstallLocation);
         var manifest = LoadOrCreateManifest(targetBasePath);
 
-        foreach (var file in mod.Files)
+        var lockObj = new object();
+
+        Parallel.ForEach(mod.Files, new ParallelOptions { CancellationToken = ctx }, file =>
         {
             if (file.Type == ModFileType.Dzip && mergedDzipNames.Contains(file.Name))
-                continue;
+                return;
 
             var relativePath = GetDeployRelativePath(file.RelativePath);
             var targetPath = Path.Combine(targetBasePath, relativePath);
@@ -37,10 +39,13 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
             {
                 File.Copy(sourcePath, targetPath, overwrite: true);
 
-                if (!manifest.ManagedFiles.Contains(relativePath))
-                    manifest.ManagedFiles.Add(relativePath);
+                lock (lockObj)
+                {
+                    if (!manifest.ManagedFiles.Contains(relativePath))
+                        manifest.ManagedFiles.Add(relativePath);
+                }
             }
-        }
+        });
 
         manifest.DeployedAt = DateTime.Now;
         SaveManifest(targetBasePath, manifest);
@@ -211,7 +216,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         {
             // No backup means this file was added by the mod - delete it
             File.Delete(filePath);
-            
+
             // Clean up empty parent directories up to the stop directory
             if (stopAtDirectory != null)
                 DeleteEmptyParentDirectories(Path.GetDirectoryName(filePath), stopAtDirectory);
@@ -220,13 +225,13 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
     private static void DeleteEmptyParentDirectories(string? directory, string stopAtDirectory)
     {
-        while (!string.IsNullOrEmpty(directory) && 
+        while (!string.IsNullOrEmpty(directory) &&
                !string.Equals(directory, stopAtDirectory, StringComparison.OrdinalIgnoreCase) &&
                Directory.Exists(directory))
         {
             if (Directory.EnumerateFileSystemEntries(directory).Any())
                 break; // Directory is not empty
-            
+
             Directory.Delete(directory);
             directory = Path.GetDirectoryName(directory);
         }

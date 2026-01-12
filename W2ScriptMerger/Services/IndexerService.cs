@@ -13,7 +13,7 @@ public class IndexerService(ConfigService configService)
     public int VanillaDzipCount { get; private set; }
     public int ModDzipCount { get; private set; }
 
-    public void IndexVanillaFiles()
+    public async Task IndexVanillaFiles(CancellationToken ctx = default)
     {
         var cookedPcPath = configService.GameCookedPCPath;
         if (string.IsNullOrEmpty(cookedPcPath) || !Directory.Exists(cookedPcPath))
@@ -32,7 +32,7 @@ public class IndexerService(ConfigService configService)
             case true:
             {
                 // First run: index all files in CookedPC as vanilla
-                var allFiles = Directory.GetFiles(cookedPcPath, "*", SearchOption.AllDirectories);
+                var allFiles = await Task.Run(() => Directory.GetFiles(cookedPcPath, "*", SearchOption.AllDirectories), ctx);
                 foreach (var filePath in allFiles)
                 {
                     var relativePath = Path.GetRelativePath(cookedPcPath, filePath);

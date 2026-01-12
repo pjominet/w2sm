@@ -12,30 +12,34 @@ public class ScriptExtractionService(ConfigService configService, IndexerService
 
     private readonly Dictionary<string, string> _vanillaDzipIndex = new(StringComparer.OrdinalIgnoreCase);
 
-    public void ExtractVanillaScripts()
+    public async Task ExtractVanillaScriptsAsync(CancellationToken ctx = default)
     {
         var cookedPcPath = configService.GameCookedPCPath;
         if (string.IsNullOrEmpty(cookedPcPath) || !Directory.Exists(cookedPcPath))
             return;
+
+        // Ensure vanilla files are indexed
+        await indexerService.IndexVanillaFiles(ctx);
 
         Directory.CreateDirectory(VanillaScriptsPath);
         _vanillaDzipIndex.Clear();
 
         // Process dzips for script extraction
         var dzipFiles = Directory.GetFiles(cookedPcPath, "*.dzip", SearchOption.TopDirectoryOnly);
-        foreach (var dzipPath in dzipFiles)
+        var tasks = dzipFiles.Select(async dzipPath =>
         {
             var dzipName = Path.GetFileName(dzipPath);
 
             if (!indexerService.IsVanillaDzip(dzipName))
-                continue;
+                return;
 
             _vanillaDzipIndex[dzipName] = dzipPath;
-            ExtractDzipIfNeeded(dzipPath, dzipName);
-        }
+            await ExtractDzipAsync(dzipPath, dzipName, ctx);
+        });
+        await Task.WhenAll(tasks);
     }
 
-    private void ExtractDzipIfNeeded(string dzipPath, string dzipName)
+    private async Task ExtractDzipAsync(string dzipPath, string dzipName, CancellationToken ctx)
     {
         var extractPath = Path.Combine(VanillaScriptsPath, dzipName);
         if (Directory.Exists(extractPath))
@@ -44,10 +48,10 @@ public class ScriptExtractionService(ConfigService configService, IndexerService
         if (!DzipContainsScripts(dzipPath))
             return;
 
-        DzipService.UnpackDzipTo(dzipPath, extractPath);
+        await DzipService.UnpackDzipToAsync(dzipPath, extractPath, ctx);
     }
 
-    public void ExtractModDzipForConflict(string modName, string modDzipPath, string dzipName)
+    internal async Task ExtractModDzipForConflictAsync(string modName, string modDzipPath, string dzipName, CancellationToken ctx)
     {
         Directory.CreateDirectory(ModScriptsPath);
 
@@ -56,19 +60,19 @@ public class ScriptExtractionService(ConfigService configService, IndexerService
             return;
 
         var normalizedDzipPath = modDzipPath.Replace('/', Path.DirectorySeparatorChar);
-        DzipService.UnpackDzipTo(normalizedDzipPath, modExtractPath);
+        await DzipService.UnpackDzipToAsync(normalizedDzipPath, modExtractPath, ctx);
     }
 
-    public bool IsVanillaDzip(string dzipName) => _vanillaDzipIndex.ContainsKey(dzipName);
+    internal bool IsVanillaDzip(string dzipName) => _vanillaDzipIndex.ContainsKey(dzipName);
 
-    public string? GetVanillaDzipPath(string dzipName) =>
+    internal string? GetVanillaDzipPath(string dzipName) =>
         _vanillaDzipIndex.GetValueOrDefault(dzipName);
 
-    public string GetVanillaExtractedPath(string dzipName) => Path.Combine(VanillaScriptsPath, dzipName);
+    internal string GetVanillaExtractedPath(string dzipName) => Path.Combine(VanillaScriptsPath, dzipName);
 
-    public string GetModExtractedPath(string modName, string dzipName) => Path.Combine(ModScriptsPath, modName, dzipName);
+    internal string GetModExtractedPath(string modName, string dzipName) => Path.Combine(ModScriptsPath, modName, dzipName);
 
-    public List<string> GetExtractedScripts(string extractedDzipPath)
+    internal List<string> GetExtractedScripts(string extractedDzipPath)
     {
         if (!Directory.Exists(extractedDzipPath))
             return [];

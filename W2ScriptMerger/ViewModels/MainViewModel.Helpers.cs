@@ -27,10 +27,9 @@ public partial class MainViewModel
 
     private async Task ExtractVanillaScripts()
     {
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
-            _indexerService.IndexVanillaFiles();
-            _extractionService.ExtractVanillaScripts();
+            await _extractionService.ExtractVanillaScriptsAsync();
             Application.Current.Dispatcher.Invoke(() =>
             {
                 var modDzipMsg = _indexerService.ModDzipCount > 0
@@ -86,7 +85,7 @@ public partial class MainViewModel
         if (LoadedMods.Count == 0)
             return;
 
-        var conflicts = await Task.Run(() => _conflictDetectionService.DetectConflicts(LoadedMods.ToList()));
+        var conflicts = await Task.Run(async () => await _conflictDetectionService.DetectConflictsAsync(LoadedMods.ToList(), CancellationToken.None));
 
         _extractionService.LoadExistingMerges(conflicts);
 

@@ -7,14 +7,14 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
 {
     private readonly Dictionary<string, DzipConflict> _conflicts = new(StringComparer.OrdinalIgnoreCase);
 
-    public List<DzipConflict> DetectConflicts(IEnumerable<ModArchive> mods)
+    public async Task<List<DzipConflict>> DetectConflictsAsync(IEnumerable<ModArchive> mods, CancellationToken ctx = default)
     {
         _conflicts.Clear();
         var modDzipSources = new Dictionary<string, List<(ModArchive Mod, ModFile File)>>(StringComparer.OrdinalIgnoreCase);
 
-        // First pass: collect all dzip files from all mods
         foreach (var mod in mods)
         {
+            ctx.ThrowIfCancellationRequested();
             foreach (var file in mod.Files.Where(f => f.Type == ModFileType.Dzip))
             {
                 var dzipName = file.Name;
@@ -79,39 +79,43 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
         }
 
         foreach (var conflict in _conflicts.Values)
-            ExtractAndAnalyzeConflict(conflict);
+            await ExtractAndAnalyzeConflictAsync(conflict, ctx);
 
         // Filter out conflicts with no script changes
         return _conflicts.Values.Where(c => c.ScriptConflicts.Count > 0).ToList();
     }
 
-    private void ExtractAndAnalyzeConflict(DzipConflict conflict)
+    private async Task ExtractAndAnalyzeConflictAsync(DzipConflict conflict, CancellationToken ctx)
     {
+        ctx.ThrowIfCancellationRequested();
         if (!Directory.Exists(conflict.VanillaExtractedPath))
-        {
-            DzipService.UnpackDzipTo(conflict.VanillaDzipPath, conflict.VanillaExtractedPath);
-        }
+            await Task.Run(async () => await DzipService.UnpackDzipToAsync(conflict.VanillaDzipPath, conflict.VanillaExtractedPath, ctx), ctx);
 
+        ctx.ThrowIfCancellationRequested();
         var vanillaScripts = extractionService.GetExtractedScripts(conflict.VanillaExtractedPath);
 
         foreach (var modSource in conflict.ModSources)
         {
+            ctx.ThrowIfCancellationRequested();
             if (!Directory.Exists(modSource.ExtractedPath))
             {
-                extractionService.ExtractModDzipForConflict(
+                await extractionService.ExtractModDzipForConflictAsync(
                     modSource.ModName,
                     modSource.DzipPath,
-                    conflict.DzipName);
+                    conflict.DzipName,
+                    ctx);
             }
         }
 
         foreach (var scriptPath in vanillaScripts)
         {
+            ctx.ThrowIfCancellationRequested();
             var vanillaScriptFullPath = Path.Combine(conflict.VanillaExtractedPath, scriptPath);
             var modVersions = new List<ModScriptVersion>();
 
             foreach (var modSource in conflict.ModSources)
             {
+                ctx.ThrowIfCancellationRequested();
                 var modScriptPath = Path.Combine(modSource.ExtractedPath, scriptPath);
                 if (File.Exists(modScriptPath) && HasFileChanged(vanillaScriptFullPath, modScriptPath))
                 {
