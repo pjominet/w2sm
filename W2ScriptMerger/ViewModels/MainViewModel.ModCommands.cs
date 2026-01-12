@@ -31,11 +31,15 @@ public partial class MainViewModel
         if (targetDirectory.HasValue())
             _configService.LastModDirectory = targetDirectory;
 
+        var loadedMods = 0;
+        var cts = new CancellationTokenSource();
+
         foreach (var file in dialog.FileNames)
         {
-            Log($"Loading: {Path.GetFileName(file)}");
+            loadedMods++;
+            StatusMessage = $"Loading mod {loadedMods} of {dialog.FileNames.Length}: {Path.GetFileName(file)}";
 
-            var archive = await Task.Run(() => _archiveService.LoadModArchive(file));
+            var archive = await Task.Run(() => _archiveService.LoadModArchive(file, cts.Token), cts.Token);
 
             if (archive.IsLoaded)
             {
@@ -43,10 +47,7 @@ public partial class MainViewModel
                 OnPropertyChanged(nameof(FilteredMods));
                 Log($"Mod staged: {archive.DisplayName}");
             }
-            else
-            {
-                Log(archive.Error ?? "Failed to add mod: Unknown error");
-            }
+            else Log(archive.Error ?? "Failed to add mod: Unknown error");
         }
 
         await UpdateLoadedModsList();

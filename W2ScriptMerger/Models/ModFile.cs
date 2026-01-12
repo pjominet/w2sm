@@ -11,7 +11,7 @@ public class ModFile
     public ModFileType Type => GetFileType(Path.GetExtension(RelativePath));
 
     [JsonIgnore]
-    public byte[] Content { get; init; } = [];
+    public byte[]? Content { get; init; }
 
     private static ModFileType GetFileType(string extension)
     {

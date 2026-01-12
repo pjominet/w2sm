@@ -22,56 +22,12 @@ public class ArchiveService(ConfigService configService)
 
             using (var archive = ArchiveFactory.Open(archivePath))
             {
-                foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
-                {
-                    var normalizedPath = DetermineRelativeModFilePath(entry.Key);
+                // Collect entries to process
+                var entriesToProcess = archive.Entries.Where(e => !e.IsDirectory).ToList();
 
-                    // ignore empty entries
-                    if (!normalizedPath.HasValue())
-                        continue;
-
-                    // ignore txt files, as they are not relevant to the mod (readme, manual install instructions, changelog, etc.)
-                    if (normalizedPath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    string fileStagingPath;
-                    if (normalizedPath.StartsWith("CookedPC/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        modArchive.ModInstallLocation = InstallLocation.CookedPC;
-                        fileStagingPath = normalizedPath;
-                    }
-                    else if (normalizedPath.StartsWith("UserContent/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        modArchive.ModInstallLocation = InstallLocation.UserContent;
-                        fileStagingPath = normalizedPath;
-                    }
-                    else
-                    {
-                        // Mark as Unknown - will be resolved during deployment based on user preference
-                        modArchive.ModInstallLocation = InstallLocation.Unknown;
-                        fileStagingPath = $"CookedPC/{normalizedPath}"; // Stage to CookedPC by default
-                    }
-
-                    await using var entryStream = await entry.OpenEntryStreamAsync(ctx ?? CancellationToken.None);
-                    using var ms = new MemoryStream();
-                    await entryStream.CopyToAsync(ms);
-                    ms.Position = 0;
-
-                    // Extract to file
-                    var stagingPath = Path.Combine(modArchive.StagingPath, fileStagingPath);
-                    Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);
-                    await using (var fileStream = File.Create(stagingPath))
-                    {
-                        await ms.CopyToAsync(fileStream);
-                    }
-
-                    // Create ModFile reference
-                    modArchive.Files.Add(new ModFile
-                    {
-                        RelativePath = fileStagingPath,
-                        Content = ms.ToArray()
-                    });
-                }
+                // Process entries concurrently
+                var tasks = entriesToProcess.Select(entry => ProcessEntryAsync(entry, modArchive, ctx ?? CancellationToken.None));
+                await Task.WhenAll(tasks);
             }
 
             modArchive.IsLoaded = true;
@@ -83,6 +39,83 @@ public class ArchiveService(ConfigService configService)
         }
 
         return modArchive;
+    }
+
+    private static async Task ProcessEntryAsync(IArchiveEntry entry, ModArchive modArchive, CancellationToken ctx)
+    {
+        var normalizedPath = DetermineRelativeModFilePath(entry.Key);
+
+        // ignore empty entries
+        if (!normalizedPath.HasValue())
+            return;
+
+        // ignore txt files, as they are not relevant to the mod (readme, manual install instructions, changelog, etc.)
+        if (normalizedPath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        string fileStagingPath;
+        if (normalizedPath.StartsWith("CookedPC/", StringComparison.OrdinalIgnoreCase))
+        {
+            modArchive.ModInstallLocation = InstallLocation.CookedPC;
+            fileStagingPath = normalizedPath;
+        }
+        else if (normalizedPath.StartsWith("UserContent/", StringComparison.OrdinalIgnoreCase))
+        {
+            modArchive.ModInstallLocation = InstallLocation.UserContent;
+            fileStagingPath = normalizedPath;
+        }
+        else
+        {
+            // Mark as Unknown - will be resolved during deployment based on user preference
+            modArchive.ModInstallLocation = InstallLocation.Unknown;
+            fileStagingPath = $"CookedPC/{normalizedPath}"; // Stage to CookedPC by default
+        }
+
+        var extension = Path.GetExtension(fileStagingPath);
+        var type = extension switch
+        {
+            ".dzip" => ModFileType.Dzip,
+            ".xml" => ModFileType.Xml,
+            ".w2strings" => ModFileType.Strings,
+            _ => ModFileType.Other
+        };
+        var shouldStoreContent = type is ModFileType.Dzip or ModFileType.Xml or ModFileType.Strings;
+
+        await using var entryStream = await entry.OpenEntryStreamAsync(ctx);
+
+        // Extract to file
+        var stagingPath = Path.Combine(modArchive.StagingPath, fileStagingPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);
+
+        byte[]? content = null;
+        if (shouldStoreContent)
+        {
+            using var ms = new MemoryStream();
+            await entryStream.CopyToAsync(ms, ctx);
+            ms.Position = 0;
+
+            await using (var fileStream = File.Create(stagingPath))
+            {
+                await ms.CopyToAsync(fileStream, ctx);
+            }
+
+            content = ms.ToArray();
+        }
+        else
+        {
+            await using var fileStream = File.Create(stagingPath);
+            await entryStream.CopyToAsync(fileStream, ctx);
+        }
+
+        // Create ModFile reference
+        lock (modArchive.Files)
+        {
+            modArchive.Files.Add(new ModFile
+            {
+                RelativePath = fileStagingPath,
+                Content = content
+            });
+        }
     }
 
     /// <summary>
