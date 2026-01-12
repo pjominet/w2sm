@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Services;
@@ -26,6 +27,7 @@ public partial class MainViewModel : ObservableObject
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
 
     public string WindowTitle => $"Witcher 2 Mod Manager v{AppVersion}";
+    public double MaxWindowHeight => SystemParameters.PrimaryScreenHeight - 100;
 
     private readonly JsonSerializerOptions _jsonSerializerOptions = new()
     {

@@ -8,7 +8,8 @@
         Title="{Binding WindowTitle}"
         Height="1000" Width="1000"
         MinHeight="650" MinWidth="900"
-        WindowStartupLocation="CenterScreen"
+        MaxHeight="{Binding MaxWindowHeight}"
+        WindowStartupLocation="CenterOwner"
         Background="#1E1E1E">
 
     <Window.DataContext>
