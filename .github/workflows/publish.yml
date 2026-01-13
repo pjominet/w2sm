@@ -11,66 +11,85 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
 
-    - name: Restore dependencies
-      run: dotnet restore
+      - name: Restore dependencies
+        run: dotnet restore
 
-    - name: Build
-      run: dotnet build --configuration Release --no-restore
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
 
-    - name: Test
-      run: dotnet test --configuration Release --no-build --verbosity normal
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal
 
-    - name: Extract version
-      id: version
-      run: |
-        [xml]$csproj = Get-Content W2ScriptMerger/W2ScriptMerger.csproj
-        $version = $csproj.Project.PropertyGroup.Version
-        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+      - name: Extract version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$csproj = Get-Content W2ScriptMerger/W2ScriptMerger.csproj
+          $version = $csproj.Project.PropertyGroup.Version
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
 
-    - name: Check if tag exists
-      id: tag_check
-      run: |
-        $result = git ls-remote --tags origin "refs/tags/v${{ steps.version.outputs.VERSION }}"
-        if ($result) {
-          echo "TAG_EXISTS=true" >> $env:GITHUB_OUTPUT
-          echo "Tag v${{ steps.version.outputs.VERSION }} already exists, skipping release"
-        } else {
-          echo "TAG_EXISTS=false" >> $env:GITHUB_OUTPUT
-          echo "Tag v${{ steps.version.outputs.VERSION }} does not exist, will create release"
-        }
+      - name: Check if tag exists
+        id: tag_check
+        shell: pwsh
+        run: |
+          $result = git ls-remote --tags origin "refs/tags/v${{ steps.version.outputs.VERSION }}"
+          if ($result) {
+            echo "TAG_EXISTS=true" >> $env:GITHUB_OUTPUT
+            echo "Tag v${{ steps.version.outputs.VERSION }} already exists, skipping release"
+          } else {
+            echo "TAG_EXISTS=false" >> $env:GITHUB_OUTPUT
+            echo "Tag v${{ steps.version.outputs.VERSION }} does not exist, will create release"
+          }
 
-    - name: Publish
-      if: steps.tag_check.outputs.TAG_EXISTS == 'false'
-      run: |
-        dotnet publish W2ScriptMerger/W2ScriptMerger.csproj `
-          --configuration Release `
-          --runtime win-x64 `
-          --self-contained true `
-          -p:PublishSingleFile=true `
-          -p:PublishReadyToRun=true `
-          -p:IncludeNativeLibrariesForSelfExtract=true `
-          -p:IncludeAllContentForSelfExtract=true `
-          -p:DebugType=none `
-          -p:DebugSymbols=false `
-          --output ./publish
+      - name: Fetch tags
+        if: steps.tag_check.outputs.TAG_EXISTS == 'false'
+        run: git fetch --tags --force
 
-    - name: Zip release
-      if: steps.tag_check.outputs.TAG_EXISTS == 'false'
-      run: Compress-Archive -Path ./publish/* -DestinationPath ./w2sm-v${{ steps.version.outputs.VERSION }}-win-x64.zip
+      - name: Generate release notes
+        if: steps.tag_check.outputs.TAG_EXISTS == 'false'
+        id: release_notes
+        shell: pwsh
+        run: |
+          ./.github/scripts/generate-release-notes.ps1 `
+            -Version "${{ steps.version.outputs.VERSION }}" `
+            -OutputFile "release-notes.txt" `
+            -IgnoredCommits @("version bump", "clean-up", "readme") `
+            -GitHubOutputFile $env:GITHUB_OUTPUT `
+            -GitHubOutputName "body"
 
-    - name: Create Release
-      if: steps.tag_check.outputs.TAG_EXISTS == 'false'
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v${{ steps.version.outputs.VERSION }}
-        files: ./w2sm-v${{ steps.version.outputs.VERSION }}-win-x64.zip
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish
+        if: steps.tag_check.outputs.TAG_EXISTS == 'false'
+        run: |
+          dotnet publish W2ScriptMerger/W2ScriptMerger.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:PublishReadyToRun=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:IncludeAllContentForSelfExtract=true `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            --output ./publish
+
+      - name: Zip release
+        if: steps.tag_check.outputs.TAG_EXISTS == 'false'
+        run: Compress-Archive -Path ./publish/* -DestinationPath ./w2sm-v${{ steps.version.outputs.VERSION }}-win-x64.zip
+
+      - name: Create Release
+        if: steps.tag_check.outputs.TAG_EXISTS == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          files: ./w2sm-v${{ steps.version.outputs.VERSION }}-win-x64.zip
+          body: ${{ steps.release_notes.outputs.body }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
