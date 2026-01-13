@@ -66,16 +66,11 @@ public class ArchiveService(ConfigService configService)
 
     private static async Task ProcessExtractedFileAsync(string archiveRelativePath, string extractedFilePath, ModArchive modArchive, CancellationToken ctx)
     {
+        // ignore unwanted entries
+        if (!IsValidArchiveEntry(archiveRelativePath))
+            return;
+
         var normalizedPath = ModPathHelper.DetermineRelativeModFilePath(archiveRelativePath);
-
-        // ignore empty entries
-        if (!normalizedPath.HasValue())
-            return;
-
-        // ignore txt files, as they are not relevant to the mod (readme, manual install instructions, changelog, etc.)
-        if (normalizedPath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
-            return;
-
         var (installLocation, relativePathWithRoot) = ModPathHelper.ResolveStagingPath(normalizedPath);
         lock (modArchive)
         {
@@ -102,5 +97,17 @@ public class ArchiveService(ConfigService configService)
                 RelativePath = relativePathWithRoot
             });
         }
+    }
+
+    private static bool IsValidArchiveEntry(string archiveRelativePath)
+    {
+        string[] unwantedFileTypes = [ ".txt", ".png", ".jpg", "jpeg" ];
+
+        // ignore empty entries
+        if (!archiveRelativePath.HasValue())
+            return false;
+
+        // ignore unwanted files, as they are not relevant to the mod (readme, manual install instructions, changelogs, screenshots etc.)
+        return !unwantedFileTypes.Contains(Path.GetExtension(archiveRelativePath), StringComparer.OrdinalIgnoreCase);
     }
 }

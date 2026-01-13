@@ -1,5 +1,3 @@
-using System;
-using System.IO;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Extensions;
 
@@ -62,14 +60,9 @@ internal static class ModPathHelper
     /// </summary>
     /// <param name="archivePath">The raw archive entry path to the file.</param>
     /// <returns>The relative path starting from the appropriate root, or the original normalized path if no root found.</returns>
-    internal static string DetermineRelativeModFilePath(string? archivePath)
+    internal static string DetermineRelativeModFilePath(string archivePath)
     {
-        if (!archivePath.HasValue())
-            return string.Empty;
-
         var normalizedPath = archivePath.NormalizePath();
-        if (normalizedPath.Length == 0)
-            return string.Empty;
 
         // Work with spans for better performance than strings/arrays when scanning for the root segment
         var span = normalizedPath.AsSpan();
@@ -89,15 +82,21 @@ internal static class ModPathHelper
                 continue;
             }
 
+            if (IsScreenshotSegment(segment))
+                return string.Empty; // ignore any screenshot folders as they are not relevant to the mod
+
             if (IsRootSegment(segment))
-                // Return the suffix starting at the detected root
-                return normalizedPath[segmentStart..];
+                return normalizedPath[segmentStart..]; // Return the suffix starting at the detected root
 
             segmentEndExclusive = i;
         }
 
-        return archivePath!;
+        return archivePath;
     }
+
+    private static bool IsScreenshotSegment(ReadOnlySpan<char> segment) =>
+        segment.Equals("screenshot", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("screenshots", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsRootSegment(ReadOnlySpan<char> segment) =>
         segment.Equals(CookedPcSegment, StringComparison.OrdinalIgnoreCase) ||

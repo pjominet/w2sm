@@ -13,12 +13,12 @@ internal static class StringExtensions
 
         internal string NormalizePath(bool trimLeadingSlash = true) => @string.HasValue()
             ? !trimLeadingSlash
-                ? @string!.Replace('\\', '/')
-                : @string!.Replace('\\', '/').TrimStart('/')
+                ? @string.Replace('\\', '/')
+                : @string.Replace('\\', '/').TrimStart('/')
             : string.Empty;
 
         internal string ToSystemPath() => @string.HasValue()
-            ? @string!.NormalizePath().Replace('/', Path.DirectorySeparatorChar)
+            ? @string.NormalizePath().Replace('/', Path.DirectorySeparatorChar)
             : string.Empty;
     }
 }
