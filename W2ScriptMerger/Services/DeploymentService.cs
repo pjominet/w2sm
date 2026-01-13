@@ -1,18 +1,55 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Tools;
 
 namespace W2ScriptMerger.Services;
 
-internal class DeploymentService(ConfigService configService, ScriptExtractionService extractionService)
+internal class DeploymentManifest
 {
-    private class DeploymentManifest
+    public DateTime DeployedAt { get; set; }
+    public List<string> ManagedFiles { get; init; } = [];
+
+    [JsonIgnore]
+    public HashSet<string> ManagedFilesIndex { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public DeploymentManifest()
     {
-        public DateTime DeployedAt { get; set; }
-        public List<string> ManagedFiles { get; init; } = [];
+        SyncIndex();
     }
 
+    // Rebuild the runtime index after deserialization so manifest files from disk inherit the fast lookups
+    public void SyncIndex()
+    {
+        ManagedFilesIndex.Clear();
+        foreach (var file in ManagedFiles)
+            ManagedFilesIndex.Add(file);
+    }
+
+    // Adds a file path while guarding against duplicates across concurrent deploy operations
+    public bool TryAdd(string relativePath)
+    {
+        if (!ManagedFilesIndex.Add(relativePath))
+            return false;
+
+        ManagedFiles.Add(relativePath);
+        return true;
+    }
+
+    // Removes a file path (used during uninstall/cleanup) and keeps both structures in sync
+    public bool Remove(string relativePath)
+    {
+        if (!ManagedFilesIndex.Remove(relativePath))
+            return false;
+
+        ManagedFiles.RemoveAll(f => string.Equals(f, relativePath, StringComparison.OrdinalIgnoreCase));
+        return true;
+    }
+}
+
+internal class DeploymentService(ConfigService configService, ScriptExtractionService extractionService)
+{
     public void DeployMod(ModArchive mod, HashSet<string> mergedDzipNames, CancellationToken ctx = default)
     {
         var targetBasePath = GetTargetPath(mod.ModInstallLocation);
@@ -25,7 +62,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
             if (file.Type == ModFileType.Dzip && mergedDzipNames.Contains(file.Name))
                 return;
 
-            var relativePath = GetDeployRelativePath(file.RelativePath);
+            var relativePath = ModPathHelper.GetDeployRelativePath(file.RelativePath);
             var targetPath = Path.Combine(targetBasePath, relativePath);
 
             BackupIfExists(targetPath);
@@ -41,8 +78,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
                 lock (lockObj)
                 {
-                    if (!manifest.ManagedFiles.Contains(relativePath))
-                        manifest.ManagedFiles.Add(relativePath);
+                    manifest.TryAdd(relativePath);
                 }
             }
         });
@@ -89,11 +125,11 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
         foreach (var file in mod.Files)
         {
-            var relativePath = GetDeployRelativePath(file.RelativePath);
+            var relativePath = ModPathHelper.GetDeployRelativePath(file.RelativePath);
             var targetPath = Path.Combine(targetBasePath, relativePath);
 
             RestoreBackup(targetPath, targetBasePath);
-            manifest.ManagedFiles.Remove(relativePath);
+            manifest.Remove(relativePath);
         }
 
         SaveManifest(targetBasePath, manifest);
@@ -150,19 +186,6 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         };
     }
 
-    private static string GetDeployRelativePath(string filePath)
-    {
-        var normalized = filePath.Replace('\\', '/');
-
-        if (normalized.StartsWith("CookedPC/", StringComparison.OrdinalIgnoreCase))
-            normalized = normalized["CookedPC/".Length..];
-        else if (normalized.StartsWith("UserContent/", StringComparison.OrdinalIgnoreCase))
-            normalized = normalized["UserContent/".Length..];
-
-        // Normalize to OS path separators for Path.Combine compatibility
-        return normalized.Replace('/', Path.DirectorySeparatorChar);
-    }
-
     private static bool BackupIfExists(string filePath)
     {
         if (!File.Exists(filePath))
@@ -186,7 +209,9 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         try
         {
             var json = File.ReadAllText(manifestPath);
-            return JsonSerializer.Deserialize<DeploymentManifest>(json) ?? new DeploymentManifest();
+            var manifest = JsonSerializer.Deserialize<DeploymentManifest>(json) ?? new DeploymentManifest();
+            manifest.SyncIndex();
+            return manifest;
         }
         catch
         {

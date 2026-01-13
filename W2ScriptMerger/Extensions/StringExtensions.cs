@@ -5,6 +5,6 @@ internal static class StringExtensions
     extension(string? @string)
     {
         internal bool HasValue(bool checkWhitespace = true) => checkWhitespace ? !string.IsNullOrWhiteSpace(@string) : !string.IsNullOrEmpty(@string);
-        internal string NormalizePath() => @string.HasValue() ? @string!.Replace('\\', '/').ToLowerInvariant().TrimStart('/') : string.Empty;
+        internal string NormalizePath() => @string.HasValue() ? @string!.Replace('\\', '/').TrimStart('/') : string.Empty;
     }
 }
