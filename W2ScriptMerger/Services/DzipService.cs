@@ -1,6 +1,7 @@
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Tools;
 
@@ -96,7 +97,7 @@ public static class DzipService
 
         foreach (var entry in entries)
         {
-            var outputPath = Path.Combine(outputDirectoryBase, entry.Name.Replace('/', Path.DirectorySeparatorChar));
+            var outputPath = Path.Combine(outputDirectoryBase, entry.Name.ToSystemPath());
             var dir = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(dir))
                 Directory.CreateDirectory(dir);

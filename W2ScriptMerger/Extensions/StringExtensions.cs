@@ -1,4 +1,6 @@
-﻿namespace W2ScriptMerger.Extensions;
+using System.IO;
+
+namespace W2ScriptMerger.Extensions;
 
 internal static class StringExtensions
 {
@@ -6,5 +8,6 @@ internal static class StringExtensions
     {
         internal bool HasValue(bool checkWhitespace = true) => checkWhitespace ? !string.IsNullOrWhiteSpace(@string) : !string.IsNullOrEmpty(@string);
         internal string NormalizePath() => @string.HasValue() ? @string!.Replace('\\', '/').TrimStart('/') : string.Empty;
+        internal string ToSystemPath() => !@string.HasValue() ? string.Empty : @string.NormalizePath().Replace('/', Path.DirectorySeparatorChar);
     }
 }

@@ -48,7 +48,7 @@ internal static class ModPathHelper
         else if (normalizedPath.StartsWith(UserContentPrefix, StringComparison.OrdinalIgnoreCase))
             normalizedPath = normalizedPath[UserContentPrefix.Length..];
 
-        return normalizedPath.Replace('/', Path.DirectorySeparatorChar);
+        return normalizedPath.ToSystemPath();
     }
 
     /// <summary>

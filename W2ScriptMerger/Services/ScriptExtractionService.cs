@@ -1,4 +1,5 @@
 using System.IO;
+using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Tools;
 
@@ -59,8 +60,7 @@ public class ScriptExtractionService(ConfigService configService, IndexerService
         if (Directory.Exists(modExtractPath))
             return;
 
-        var normalizedDzipPath = modDzipPath.Replace('/', Path.DirectorySeparatorChar);
-        await DzipService.UnpackDzipToAsync(normalizedDzipPath, modExtractPath, ctx);
+        await DzipService.UnpackDzipToAsync(modDzipPath.ToSystemPath(), modExtractPath, ctx);
     }
 
     internal bool IsVanillaDzip(string dzipName) => _vanillaDzipIndex.ContainsKey(dzipName);

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Tools;
 
@@ -71,15 +72,15 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
             if (!string.IsNullOrEmpty(dir))
                 Directory.CreateDirectory(dir);
 
-            var sourcePath = Path.Combine(mod.StagingPath, file.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-            if (File.Exists(sourcePath))
-            {
-                File.Copy(sourcePath, targetPath, overwrite: true);
+            var sourcePath = Path.Combine(mod.StagingPath, file.RelativePath.ToSystemPath());
+            if (!File.Exists(sourcePath))
+                return;
 
-                lock (lockObj)
-                {
-                    manifest.TryAdd(relativePath);
-                }
+            File.Copy(sourcePath, targetPath, overwrite: true);
+
+            lock (lockObj)
+            {
+                manifest.TryAdd(relativePath);
             }
         });
 
