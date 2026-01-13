@@ -1,28 +1,40 @@
 using System.IO;
 using W2ScriptMerger.Services;
+using W2ScriptMerger.Tests.Infrastructure;
 
 namespace W2ScriptMerger.Tests;
 
-public class DzipServiceTests
+public class DzipServiceTests : IDisposable
 {
-    private readonly string _testDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestData");
-    private readonly string _tempPath = Path.Combine(Path.GetTempPath(), "W2ScriptMerger_Tests");
+    private readonly TestArtifactScope _scope;
+    private readonly string _workRoot;
+    private readonly string _sampleDzip;
 
     public DzipServiceTests()
     {
-        if (Directory.Exists(_tempPath))
-            Directory.Delete(_tempPath, true);
-        Directory.CreateDirectory(_tempPath);
+        _scope = TestArtifactScope.Create(nameof(DzipServiceTests));
+        _workRoot = _scope.CreateSubdirectory("work");
+        _sampleDzip = PrepareSampleDzip();
+    }
+
+    public void Dispose() => _scope.Dispose();
+
+    private string PrepareSampleDzip()
+    {
+        var sourceDir = _scope.CreateSubdirectory("sample_source");
+        var scriptPath = Path.Combine(sourceDir, "scripts", "mock.ws");
+        Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
+        File.WriteAllText(scriptPath, "// mock script");
+
+        var dzipPath = Path.Combine(_workRoot, "mock_scripts.dzip");
+        DzipService.PackDzip(dzipPath, sourceDir);
+        return dzipPath;
     }
 
     [Fact]
     public void ListEntries_ReturnsEntriesFromDzip()
     {
-        var dzipPath = Path.Combine(_testDataPath, "test_scripts.dzip");
-        if (!File.Exists(dzipPath))
-            return;
-
-        var entries = DzipService.ListEntries(dzipPath);
+        var entries = DzipService.ListEntries(_sampleDzip);
 
         Assert.NotEmpty(entries);
         Assert.All(entries, e => Assert.False(string.IsNullOrEmpty(e.Name)));
@@ -31,13 +43,9 @@ public class DzipServiceTests
     [Fact]
     public void UnpackDzipTo_ExtractsFilesToDirectory()
     {
-        var dzipPath = Path.Combine(_testDataPath, "test_scripts.dzip");
-        if (!File.Exists(dzipPath))
-            return;
+        var outputPath = _scope.CreateSubdirectory("extracted");
 
-        var outputPath = Path.Combine(_tempPath, "extracted");
-
-        DzipService.UnpackDzipTo(dzipPath, outputPath);
+        DzipService.UnpackDzipTo(_sampleDzip, outputPath);
 
         Assert.True(Directory.Exists(outputPath));
         var files = Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories);
@@ -47,7 +55,7 @@ public class DzipServiceTests
     [Fact]
     public void PackDzip_CreatesValidDzipArchive()
     {
-        var sourceDir = Path.Combine(_tempPath, "pack_source");
+        var sourceDir = _scope.CreateSubdirectory("pack_source");
         Directory.CreateDirectory(sourceDir);
 
         var testFile = Path.Combine(sourceDir, "test.ws");
@@ -56,7 +64,7 @@ public class DzipServiceTests
                                     class TestClass {}
                                     """);
 
-        var outputDzip = Path.Combine(_tempPath, "output.dzip");
+        var outputDzip = Path.Combine(_workRoot, "output.dzip");
 
         DzipService.PackDzip(outputDzip, sourceDir);
 
@@ -70,7 +78,7 @@ public class DzipServiceTests
     [Fact]
     public void PackAndUnpack_RoundTrip_PreservesContent()
     {
-        var sourceDir = Path.Combine(_tempPath, "roundtrip_source");
+        var sourceDir = _scope.CreateSubdirectory("roundtrip_source");
         Directory.CreateDirectory(sourceDir);
 
         const string originalContent = """
@@ -83,10 +91,10 @@ public class DzipServiceTests
         Directory.CreateDirectory(Path.GetDirectoryName(testFile)!);
         File.WriteAllText(testFile, originalContent);
 
-        var dzipPath = Path.Combine(_tempPath, "roundtrip.dzip");
+        var dzipPath = Path.Combine(_workRoot, "roundtrip.dzip");
         DzipService.PackDzip(dzipPath, sourceDir);
 
-        var extractDir = Path.Combine(_tempPath, "roundtrip_extracted");
+        var extractDir = _scope.CreateSubdirectory("roundtrip_extracted");
         DzipService.UnpackDzipTo(dzipPath, extractDir);
 
         var extractedFile = Path.Combine(extractDir, "scripts", "test.ws");

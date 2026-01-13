@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using W2ScriptMerger.Services;
+using W2ScriptMerger.Tests.Infrastructure;
 
 namespace W2ScriptMerger.Tests;
 
@@ -10,30 +11,19 @@ public class ConfigServiceTests : IDisposable
     private const string VanillaScriptsFolder = "vanilla_scripts";
     private const string ModScriptsFolder = "mod_scripts";
 
+    private readonly TestArtifactScope _scope;
     private readonly string _sourcePath;
     private readonly string _destPath;
     private readonly JsonSerializerOptions _options = new() { WriteIndented = true };
 
     public ConfigServiceTests()
     {
-        var basePath = Path.Combine(Path.GetTempPath(), "W2ScriptMerger_ConfigTests");
-        _sourcePath = Path.Combine(basePath, "source");
-        _destPath = Path.Combine(basePath, "dest");
-
-        // Clean up any previous test runs
-        if (Directory.Exists(basePath))
-            Directory.Delete(basePath, true);
-
-        Directory.CreateDirectory(_sourcePath);
-        Directory.CreateDirectory(_destPath);
+        _scope = TestArtifactScope.Create(nameof(ConfigServiceTests));
+        _sourcePath = _scope.CreateSubdirectory("source");
+        _destPath = _scope.CreateSubdirectory("dest");
     }
 
-    public void Dispose()
-    {
-        var basePath = Path.GetDirectoryName(_sourcePath)!;
-        if (Directory.Exists(basePath))
-            Directory.Delete(basePath, true);
-    }
+    public void Dispose() => _scope.Dispose();
 
     [Fact]
     public void MigrateRuntimeData_CopiesFoldersToNewLocation()

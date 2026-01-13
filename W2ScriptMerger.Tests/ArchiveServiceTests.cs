@@ -3,34 +3,36 @@ using System.Text.Json;
 using SharpSevenZip;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Services;
+using W2ScriptMerger.Tests.Infrastructure;
 
 namespace W2ScriptMerger.Tests;
 
-public class ArchiveServiceTests
+public class ArchiveServiceTests : IDisposable
 {
     private readonly string _testDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestData");
-    private readonly string _tempPath = Path.Combine(Path.GetTempPath(), "W2ScriptMerger_ArchiveTests");
+    private readonly TestArtifactScope _scope;
     private readonly ArchiveService _archiveService;
 
     public ArchiveServiceTests()
     {
-        if (Directory.Exists(_tempPath))
-            Directory.Delete(_tempPath, true);
-        Directory.CreateDirectory(_tempPath);
+        _scope = TestArtifactScope.Create(nameof(ArchiveServiceTests));
+        var runtimePath = _scope.CreateSubdirectory("runtime");
 
         var options = new JsonSerializerOptions { WriteIndented = true };
         var configService = new ConfigService(options)
         {
-            RuntimeDataPath = _tempPath
+            RuntimeDataPath = runtimePath
         };
         SharpSevenZipBase.SetLibraryPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dependencies", "7z.dll"));
         _archiveService = new ArchiveService(configService);
     }
 
+    public void Dispose() => _scope.Dispose();
+
     [Fact]
     public async Task LoadModArchive_WithDzipFile_ExtractsAndIdentifiesFiles()
     {
-        var archivePath = Path.Combine(_testDataPath, "CEO - dzip-89-1-6g.rar");
+        var archivePath = Path.Combine(_testDataPath, "test_mod-89-1-6g.rar");
         if (!File.Exists(archivePath))
             return;
 
@@ -44,7 +46,7 @@ public class ArchiveServiceTests
     [Fact]
     public async Task LoadModArchive_WithBaseScriptsDzip_IdentifiesAsConflictCandidate()
     {
-        var archivePath = Path.Combine(_testDataPath, "base_scripts.zip-847-1-00.zip");
+        var archivePath = Path.Combine(_testDataPath, "base_scripts-847-1-00.zip");
         if (!File.Exists(archivePath))
             return;
 
@@ -58,20 +60,20 @@ public class ArchiveServiceTests
     [Fact]
     public async Task LoadModArchive_SetsCorrectDisplayName()
     {
-        var archivePath = Path.Combine(_testDataPath, "CEO - dzip-89-1-6g.rar");
+        var archivePath = Path.Combine(_testDataPath, "test_mod-89-1-6g.rar");
         if (!File.Exists(archivePath))
             return;
 
         var result = await _archiveService.LoadModArchive(archivePath);
 
-        Assert.Equal("CEO - dzip", result.DisplayName);
+        Assert.Equal("test_mod", result.DisplayName);
         Assert.Equal("-89-1-6g", result.NexusId);
     }
 
     [Fact]
     public async Task LoadModArchive_IgnoresTxtFiles()
     {
-        var archivePath = Path.Combine(_testDataPath, "CEO - dzip-89-1-6g.rar");
+        var archivePath = Path.Combine(_testDataPath, "test_mod-89-1-6g.rar");
         if (!File.Exists(archivePath))
             return;
 

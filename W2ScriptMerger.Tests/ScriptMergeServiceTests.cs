@@ -3,12 +3,14 @@ using System.Text;
 using System.Text.Json;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Services;
+using W2ScriptMerger.Tests.Infrastructure;
 
 namespace W2ScriptMerger.Tests;
 
-public class ScriptMergeServiceTests
+public class ScriptMergeServiceTests : IDisposable
 {
-    private readonly string _tempPath = Path.Combine(Path.GetTempPath(), "W2ScriptMerger_MergeTests");
+    private readonly TestArtifactScope _scope;
+    private readonly string _workspace;
 
     static ScriptMergeServiceTests()
     {
@@ -17,10 +19,11 @@ public class ScriptMergeServiceTests
 
     public ScriptMergeServiceTests()
     {
-        if (Directory.Exists(_tempPath))
-            Directory.Delete(_tempPath, true);
-        Directory.CreateDirectory(_tempPath);
+        _scope = TestArtifactScope.Create(nameof(ScriptMergeServiceTests));
+        _workspace = _scope.CreateSubdirectory("workspace");
     }
+
+    public void Dispose() => _scope.Dispose();
 
     [Fact]
     public void AttemptAutoMerge_WithNonConflictingChanges_Succeeds()
@@ -47,8 +50,8 @@ public class ScriptMergeServiceTests
                                   }
                                   """;
 
-        var vanillaPath = Path.Combine(_tempPath, "vanilla.ws");
-        var modPath = Path.Combine(_tempPath, "mod.ws");
+        var vanillaPath = Path.Combine(_workspace, "vanilla.ws");
+        var modPath = Path.Combine(_workspace, "mod.ws");
 
         File.WriteAllText(vanillaPath, vanillaContent, Encoding.GetEncoding(1250));
         File.WriteAllText(modPath, modContent, Encoding.GetEncoding(1250));
@@ -71,7 +74,7 @@ public class ScriptMergeServiceTests
         };
         var configService = new ConfigService(options)
         {
-            RuntimeDataPath = _tempPath
+            RuntimeDataPath = _workspace
         };
         var vanillaIndexService = new IndexerService(configService);
         var extractionService = new ScriptExtractionService(configService, vanillaIndexService);
@@ -103,8 +106,8 @@ public class ScriptMergeServiceTests
                                   }
                                   """;
 
-        var vanillaPath = Path.Combine(_tempPath, "vanilla2.ws");
-        var modPath = Path.Combine(_tempPath, "mod.ws");
+        var vanillaPath = Path.Combine(_workspace, "vanilla2.ws");
+        var modPath = Path.Combine(_workspace, "mod.ws");
 
         File.WriteAllText(vanillaPath, vanillaContent, Encoding.GetEncoding(1250));
         File.WriteAllText(modPath, modContent, Encoding.GetEncoding(1250));
@@ -123,7 +126,7 @@ public class ScriptMergeServiceTests
         };
         var configService = new ConfigService(options)
         {
-            RuntimeDataPath = _tempPath
+            RuntimeDataPath = _workspace
         };
         var vanillaIndexService = new IndexerService(configService);
         var extractionService = new ScriptExtractionService(configService, vanillaIndexService);
