@@ -60,7 +60,7 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
 
         Parallel.ForEach(mod.Files, new ParallelOptions { CancellationToken = ctx }, file =>
         {
-            if (file.Type == ModFileType.Dzip && mergedDzipNames.Contains(file.Name))
+            if (file.Type is ModFileType.Dzip && mergedDzipNames.Contains(file.Name))
                 return;
 
             var relativePath = ModPathHelper.GetDeployRelativePath(file.RelativePath);

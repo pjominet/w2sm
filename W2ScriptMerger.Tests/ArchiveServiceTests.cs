@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using SharpSevenZip;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Services;
 
@@ -22,6 +23,7 @@ public class ArchiveServiceTests
         {
             RuntimeDataPath = _tempPath
         };
+        SharpSevenZipBase.SetLibraryPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dependencies", "7z.dll"));
         _archiveService = new ArchiveService(configService);
     }
 
@@ -34,9 +36,9 @@ public class ArchiveServiceTests
 
         var result = await _archiveService.LoadModArchive(archivePath);
 
-        Assert.True(result.IsLoaded);
+        Assert.True(result.IsLoaded, result.Error);
         Assert.NotEmpty(result.Files);
-        Assert.Contains(result.Files, f => f.Type == ModFileType.Dzip);
+        Assert.Contains(result.Files, f => f.Type is ModFileType.Dzip);
     }
 
     [Fact]
@@ -48,7 +50,7 @@ public class ArchiveServiceTests
 
         var result = await _archiveService.LoadModArchive(archivePath);
 
-        Assert.True(result.IsLoaded);
+        Assert.True(result.IsLoaded, result.Error);
         Assert.Contains(result.Files, f =>
             f.Name.Equals("base_scripts.dzip", StringComparison.OrdinalIgnoreCase));
     }
