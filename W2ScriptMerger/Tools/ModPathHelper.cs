@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Extensions;
@@ -6,8 +7,10 @@ namespace W2ScriptMerger.Tools;
 
 internal static class ModPathHelper
 {
-    private const string CookedPcPrefix = "CookedPC/";
-    private const string UserContentPrefix = "UserContent/";
+    private const string CookedPcSegment = "CookedPC";
+    private const string CookedPcPrefix = CookedPcSegment + "/";
+    private const string UserContentSegment = "UserContent";
+    private const string UserContentPrefix = UserContentSegment + "/";
 
     /// <summary>
     /// Normalizes a path from an archive entry and determines which Witcher 2 install root it belongs to.
@@ -64,23 +67,39 @@ internal static class ModPathHelper
         if (!archivePath.HasValue())
             return string.Empty;
 
-        var segments = archivePath.NormalizePath().Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var rootIndex = -1;
+        var normalizedPath = archivePath.NormalizePath();
+        if (normalizedPath.Length == 0)
+            return string.Empty;
 
-        // Find the index of the first "cookedpc" or "usercontent" starting from the bottom (closest to the file)
-        for (var i = segments.Length - 1; i >= 0; i--)
+        // Work with spans for better performance than strings/arrays when scanning for the root segment
+        var span = normalizedPath.AsSpan();
+        var segmentEndExclusive = span.Length;
+
+        // Walk backwards, checking each segment between '/' characters until we find the deepest CookedPC/UserContent folder
+        for (var i = span.Length - 1; i >= -1; i--)
         {
-            var seg = segments[i].ToLowerInvariant();
-            if (seg is not ("cookedpc" or "usercontent"))
+            if (i >= 0 && span[i] != '/')
                 continue;
 
-            rootIndex = i;
-            break;
+            var segmentStart = i + 1;
+            var segment = span.Slice(segmentStart, segmentEndExclusive - segmentStart);
+            if (segment.Length == 0)
+            {
+                segmentEndExclusive = i;
+                continue;
+            }
+
+            if (IsRootSegment(segment))
+                // Return the suffix starting at the detected root
+                return normalizedPath[segmentStart..];
+
+            segmentEndExclusive = i;
         }
 
-        // If a root was found, return the path from that root onwards; otherwise, return the original normalized path
-        return rootIndex >= 0
-            ? string.Join("/", segments.Skip(rootIndex))
-            : archivePath!;
+        return archivePath!;
     }
+
+    private static bool IsRootSegment(ReadOnlySpan<char> segment) =>
+        segment.Equals(CookedPcSegment, StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals(UserContentSegment, StringComparison.OrdinalIgnoreCase);
 }
