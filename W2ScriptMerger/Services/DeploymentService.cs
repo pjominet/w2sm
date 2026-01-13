@@ -1,53 +1,10 @@
 using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Tools;
 
 namespace W2ScriptMerger.Services;
-
-internal class DeploymentManifest
-{
-    public DateTime DeployedAt { get; set; }
-    public List<string> ManagedFiles { get; init; } = [];
-
-    [JsonIgnore]
-    public HashSet<string> ManagedFilesIndex { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    public DeploymentManifest()
-    {
-        SyncIndex();
-    }
-
-    // Rebuild the runtime index after deserialization so manifest files from disk inherit the fast lookups
-    public void SyncIndex()
-    {
-        ManagedFilesIndex.Clear();
-        foreach (var file in ManagedFiles)
-            ManagedFilesIndex.Add(file);
-    }
-
-    // Adds a file path while guarding against duplicates across concurrent deploy operations
-    public bool TryAdd(string relativePath)
-    {
-        if (!ManagedFilesIndex.Add(relativePath))
-            return false;
-
-        ManagedFiles.Add(relativePath);
-        return true;
-    }
-
-    // Removes a file path (used during uninstall/cleanup) and keeps both structures in sync
-    public bool Remove(string relativePath)
-    {
-        if (!ManagedFilesIndex.Remove(relativePath))
-            return false;
-
-        ManagedFiles.RemoveAll(f => string.Equals(f, relativePath, StringComparison.OrdinalIgnoreCase));
-        return true;
-    }
-}
 
 internal class DeploymentService(ConfigService configService, ScriptExtractionService extractionService)
 {
@@ -158,11 +115,8 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
     {
         var manifest = LoadOrCreateManifest(targetBasePath);
 
-        foreach (var managedFile in manifest.ManagedFiles)
-        {
-            var filePath = Path.Combine(targetBasePath, managedFile);
+        foreach (var filePath in manifest.ManagedFiles.Select(managedFile => Path.Combine(targetBasePath, managedFile)))
             RestoreBackup(filePath, targetBasePath);
-        }
 
         var manifestPath = Path.Combine(targetBasePath, Constants.DEPLOY_MANIFEST_FILENAME);
         if (File.Exists(manifestPath))
@@ -187,40 +141,39 @@ internal class DeploymentService(ConfigService configService, ScriptExtractionSe
         };
     }
 
-    private static bool BackupIfExists(string filePath)
+    private static void BackupIfExists(string filePath)
     {
         if (!File.Exists(filePath))
-            return false;
+            return;
 
         var backupPath = filePath + Constants.BACKUP_FILE_EXTENSION;
 
         if (File.Exists(backupPath))
-            return false;
+            return;
 
         File.Copy(filePath, backupPath, overwrite: false);
-        return true;
     }
 
-    private static DeploymentManifest LoadOrCreateManifest(string targetBasePath)
+    private static DeployManifest LoadOrCreateManifest(string targetBasePath)
     {
         var manifestPath = Path.Combine(targetBasePath, Constants.DEPLOY_MANIFEST_FILENAME);
         if (!File.Exists(manifestPath))
-            return new DeploymentManifest();
+            return new DeployManifest();
 
         try
         {
             var json = File.ReadAllText(manifestPath);
-            var manifest = JsonSerializer.Deserialize<DeploymentManifest>(json) ?? new DeploymentManifest();
+            var manifest = JsonSerializer.Deserialize<DeployManifest>(json) ?? new DeployManifest();
             manifest.SyncIndex();
             return manifest;
         }
         catch
         {
-            return new DeploymentManifest();
+            return new DeployManifest();
         }
     }
 
-    private void SaveManifest(string targetBasePath, DeploymentManifest manifest)
+    private void SaveManifest(string targetBasePath, DeployManifest manifest)
     {
         var manifestPath = Path.Combine(targetBasePath, Constants.DEPLOY_MANIFEST_FILENAME);
         var json = JsonSerializer.Serialize(manifest, configService.JsonSerializerOptions);

@@ -159,7 +159,7 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
             return true;
 
         // Stream both files in fixed-size chunks to avoid allocating large byte arrays for whole scripts into memory
-        const int bufferSize = 1024 * 64;
+        const int bufferSize = 64 * 1024; // 64KiB, CPU cache friendly size, while minimizing the time spent copying arrays before comparison
         var vanillaBuffer = new byte[bufferSize];
         var modBuffer = new byte[bufferSize];
 
