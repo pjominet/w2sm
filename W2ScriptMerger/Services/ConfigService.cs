@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Tools;
 
@@ -92,7 +93,7 @@ public class ConfigService
         }
     }
 
-    public string? GameCookedPCPath => string.IsNullOrEmpty(Config.GamePath) ? null : Path.Combine(Config.GamePath, "CookedPC");
+    public string? GameCookedPCPath => Config.GamePath.HasValue() ? null : Path.Combine(Config.GamePath!, "CookedPC");
 
     public string? LastModDirectory
     {

@@ -39,7 +39,7 @@ internal static class ModPathHelper
 
     /// <summary>
     /// Converts a staged file path into the relative path that should be applied during deployment.
-    /// Any CookedPC/UserContent prefixes are trimmed and the result is normalized to OS-specific separators for <see cref="Path.Combine"/>.
+    /// Any CookedPC/UserContent prefixes are trimmed and the result is normalized to OS-specific separators.
     /// </summary>
     /// <param name="filePath">Path recorded in the mod archive metadata.</param>
     internal static string GetDeployRelativePath(string filePath)

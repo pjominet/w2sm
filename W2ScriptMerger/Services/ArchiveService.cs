@@ -43,7 +43,7 @@ public class ArchiveService(ConfigService configService)
                     MaxDegreeOfParallelism = Environment.ProcessorCount
                 }, async (extractedFilePath, ct) =>
                 {
-                    var relativeArchivePath = Path.GetRelativePath(tempExtractPath, extractedFilePath).Replace('\\', '/');
+                    var relativeArchivePath = Path.GetRelativePath(tempExtractPath, extractedFilePath).NormalizePath(false);
                     await ProcessExtractedFileAsync(relativeArchivePath, extractedFilePath, modArchive, ct);
                 });
             }
@@ -86,9 +86,10 @@ public class ArchiveService(ConfigService configService)
         var stagingPath = Path.Combine(modArchive.StagingPath, relativePathWithRoot);
         Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);
 
-        // Stream copy so we never load entire files into memory, regardless of extension
-        await using (var source = new FileStream(extractedFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 81920, useAsync: true))
-        await using (var dest = new FileStream(stagingPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920, useAsync: true))
+        // Stream copy to never load entire files into memory, regardless of extension
+        const int bufferSize = 5 * 16 * 1024; // 80KiB, tuned for high I/O throughput while keeping allocations small enough to be reused across many concurrent extract operations
+        await using (var source = new FileStream(extractedFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, useAsync: true))
+        await using (var dest = new FileStream(stagingPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize, useAsync: true))
         {
             await source.CopyToAsync(dest, ctx);
         }
