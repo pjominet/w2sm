@@ -61,7 +61,7 @@ jobs:
           ./.github/scripts/generate-release-notes.ps1 `
             -Version "${{ steps.version.outputs.VERSION }}" `
             -OutputFile "release-notes.txt" `
-            -IgnoredCommits @("version bump", "clean-up", "readme") `
+            -IgnoredCommits @("version bump", "clean-up", "readme", "merge remote-tracking branch") `
             -GitHubOutputFile $env:GITHUB_OUTPUT `
             -GitHubOutputName "body"
 

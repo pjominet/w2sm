@@ -27,6 +27,11 @@ if ([string]::IsNullOrWhiteSpace($previousTag)) {
     $logEntries = git log "$previousTag..HEAD" --pretty="%s"
 }
 
+echo "Previous tag: $previousTag"
+echo "Current tag: $currentTag"
+echo "Log entries: $logEntries"
+echo "Ignored commits containing: $IgnoredCommits"
+
 $filteredEntries = @()
 foreach ($entry in $logEntries) {
     $trimmed = $entry.Trim()
