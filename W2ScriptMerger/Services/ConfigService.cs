@@ -68,28 +68,11 @@ public class ConfigService
             if (Directory.Exists(destDir))
                 Directory.Delete(destDir, true);
 
-            CopyDirectory(sourceDir, destDir);
+            DirectoryUtils.CopyDirectory(sourceDir, destDir);
             Directory.Delete(sourceDir, true);
         }
 
         RuntimeDataPath = newPath;
-    }
-
-    private static void CopyDirectory(string sourceDir, string destDir)
-    {
-        Directory.CreateDirectory(destDir);
-
-        foreach (var file in Directory.GetFiles(sourceDir))
-        {
-            var destFile = Path.Combine(destDir, Path.GetFileName(file));
-            File.Copy(file, destFile, overwrite: true);
-        }
-
-        foreach (var dir in Directory.GetDirectories(sourceDir))
-        {
-            var destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
-            CopyDirectory(dir, destSubDir);
-        }
     }
 
     public string UserContentPath

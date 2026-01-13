@@ -188,10 +188,10 @@ public class ScriptExtractionService(ConfigService configService, IndexerService
         Directory.CreateDirectory(tempCombinedDir);
 
         // Step 1: Copy ALL files from vanilla extraction
-        CopyDirectory(vanillaDir, tempCombinedDir);
+        DirectoryUtils.CopyDirectory(vanillaDir, tempCombinedDir);
 
         // Step 2: Overlay merged files (overwrites vanilla versions)
-        CopyDirectory(mergedDir, tempCombinedDir);
+        DirectoryUtils.CopyDirectory(mergedDir, tempCombinedDir);
 
         // Step 3: Pack the combined directory
         var outputPath = Path.Combine(packedFolder, dzipName);
@@ -206,22 +206,6 @@ public class ScriptExtractionService(ConfigService configService, IndexerService
         return outputPath;
     }
 
-    private static void CopyDirectory(string sourceDir, string destDir)
-    {
-        Directory.CreateDirectory(destDir);
-
-        foreach (var file in Directory.GetFiles(sourceDir))
-        {
-            var destFile = Path.Combine(destDir, Path.GetFileName(file));
-            File.Copy(file, destFile, overwrite: true);
-        }
-
-        foreach (var dir in Directory.GetDirectories(sourceDir))
-        {
-            var destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
-            CopyDirectory(dir, destSubDir);
-        }
-    }
 
     public void CleanupExtractedFiles()
     {
