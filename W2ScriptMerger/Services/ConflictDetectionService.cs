@@ -158,9 +158,34 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
         if (vanillaInfo.Length != modInfo.Length)
             return true;
 
-        // Same size - compare content
-        var vanillaBytes = File.ReadAllBytes(vanillaPath);
-        var modBytes = File.ReadAllBytes(modPath);
-        return !vanillaBytes.SequenceEqual(modBytes);
+        // Stream both files in fixed-size chunks to avoid allocating large byte arrays for whole scripts into memory
+        const int bufferSize = 1024 * 64;
+        var vanillaBuffer = new byte[bufferSize];
+        var modBuffer = new byte[bufferSize];
+
+        using var vanillaStream = new FileStream(vanillaPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, useAsync: false);
+        using var modStream = new FileStream(modPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, useAsync: false);
+
+        while (true)
+        {
+            // Read the next chunk from both files and compare lengths first for early exit
+            var vanillaRead = vanillaStream.Read(vanillaBuffer, 0, bufferSize);
+            var modRead = modStream.Read(modBuffer, 0, bufferSize);
+
+            if (vanillaRead != modRead)
+                return true;
+
+            if (vanillaRead == 0)
+                break;
+
+            // Byte-by-byte comparison of the chunk; any difference means the file changed
+            for (var i = 0; i < vanillaRead; i++)
+            {
+                if (vanillaBuffer[i] != modBuffer[i])
+                    return true;
+            }
+        }
+
+        return false;
     }
 }
