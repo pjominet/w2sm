@@ -1,4 +1,5 @@
 using System.IO;
+using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
@@ -36,50 +37,50 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
 
             switch (isVanillaDzip)
             {
-                // For vanilla dzips, we need at least 1 mod; for mod-added, we need 2+ mods
+                // For mod-added, we need 2+ mods to create a conflict
                 case false when sources.Count < 2:
-                // Vanilla dzips need at least one mod to create a conflict
+                // Vanilla dzips need at only one mod to create a conflict
                 case true when sources.Count < 1:
                     continue;
             }
 
-            var vanillaDzipPath = indexService.GetGameDzipPath(dzipName);
-            string vanillaExtractedPath;
+            var dzipPath = indexService.GetGameDzipPath(dzipName);
+            string extractionPath;
 
-            if (isVanillaDzip && vanillaDzipPath is not null)
-                vanillaExtractedPath = extractionService.GetVanillaExtractedPath(dzipName);
+            if (isVanillaDzip && dzipPath is not null)
+                extractionPath = extractionService.GetGameFileExtractionPath(dzipName);
             else
             {
                 // For mod-added dzips, use the first mod's version as the "base"
                 var firstSource = sources[0];
-                vanillaDzipPath = Path.Combine(firstSource.Mod.StagingPath, firstSource.File.RelativePath);
-                vanillaExtractedPath = extractionService.GetModExtractedPath(firstSource.Mod.ModName, dzipName);
+                dzipPath = Path.Combine(firstSource.Mod.StagingPath, firstSource.File.RelativePath);
+                extractionPath = extractionService.GetModFileExtractionPath(firstSource.Mod.ModName, dzipName);
             }
 
             var conflict = new DzipConflict
             {
                 DzipName = dzipName,
-                VanillaDzipPath = vanillaDzipPath,
-                VanillaExtractedPath = vanillaExtractedPath,
+                BaseDzipPath = dzipPath,
+                BaseExtractionPath = extractionPath,
                 IsAddedByMod = !isVanillaDzip
             };
             _conflicts[dzipName] = conflict;
 
             foreach (var (mod, file) in sources)
             {
-                var modDzipPath = Path.Combine(mod.StagingPath, file.RelativePath);
+                var modDzipPath = Path.Combine(mod.StagingPath, file.RelativePath.ToSystemPath());
                 conflict.ModSources.Add(new ModDzipSource
                 {
                     ModName = mod.ModName,
                     DisplayName = mod.DisplayName,
                     DzipPath = modDzipPath,
-                    ExtractedPath = extractionService.GetModExtractedPath(mod.ModName, dzipName)
+                    ExtractedPath = extractionService.GetModFileExtractionPath(mod.ModName, dzipName)
                 });
             }
         }
 
-        foreach (var conflict in _conflicts.Values)
-            await ExtractAndAnalyzeConflictAsync(conflict, ctx);
+        var analysisTasks = _conflicts.Values.Select(conflict => ExtractAndAnalyzeConflictAsync(conflict, ctx)).ToList();
+        await Task.WhenAll(analysisTasks);
 
         // Filter out conflicts with no script changes
         return _conflicts.Values.Where(c => c.ScriptConflicts.Count > 0).ToList();
@@ -88,11 +89,11 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
     private async Task ExtractAndAnalyzeConflictAsync(DzipConflict conflict, CancellationToken ctx)
     {
         ctx.ThrowIfCancellationRequested();
-        if (!Directory.Exists(conflict.VanillaExtractedPath))
-            await Task.Run(async () => await DzipService.UnpackDzipToAsync(conflict.VanillaDzipPath, conflict.VanillaExtractedPath, ctx), ctx);
+        if (!Directory.Exists(conflict.BaseExtractionPath))
+            await DzipService.UnpackDzipToAsync(conflict.BaseDzipPath, conflict.BaseExtractionPath, ctx);
 
         ctx.ThrowIfCancellationRequested();
-        var vanillaScripts = extractionService.GetExtractedScripts(conflict.VanillaExtractedPath);
+        var baseScripts = await extractionService.GetExtractedScriptsAsync(conflict.BaseExtractionPath, ctx);
 
         foreach (var modSource in conflict.ModSources)
         {
@@ -107,17 +108,17 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
             }
         }
 
-        foreach (var scriptPath in vanillaScripts)
+        foreach (var scriptPath in baseScripts)
         {
             ctx.ThrowIfCancellationRequested();
-            var vanillaScriptFullPath = Path.Combine(conflict.VanillaExtractedPath, scriptPath);
+            var vanillaScriptFullPath = Path.Combine(conflict.BaseExtractionPath, scriptPath);
             var modVersions = new List<ModScriptVersion>();
 
             foreach (var modSource in conflict.ModSources)
             {
                 ctx.ThrowIfCancellationRequested();
                 var modScriptPath = Path.Combine(modSource.ExtractedPath, scriptPath);
-                if (File.Exists(modScriptPath) && HasFileChanged(vanillaScriptFullPath, modScriptPath))
+                if (File.Exists(modScriptPath) && await HasFileChangedAsync(vanillaScriptFullPath, modScriptPath, ctx))
                 {
                     modVersions.Add(new ModScriptVersion
                     {
@@ -149,7 +150,7 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
     /// Checks if a mod file differs from the vanilla version.
     /// Uses file size first (fast), then byte comparison if sizes match.
     /// </summary>
-    private static bool HasFileChanged(string vanillaPath, string modPath)
+    private static async Task<bool> HasFileChangedAsync(string vanillaPath, string modPath, CancellationToken ctx)
     {
         var vanillaInfo = new FileInfo(vanillaPath);
         var modInfo = new FileInfo(modPath);
@@ -163,14 +164,14 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
         var vanillaBuffer = new byte[bufferSize];
         var modBuffer = new byte[bufferSize];
 
-        using var vanillaStream = new FileStream(vanillaPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, useAsync: false);
-        using var modStream = new FileStream(modPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, useAsync: false);
+        await using var vanillaStream = new FileStream(vanillaPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, useAsync: true);
+        await using var modStream = new FileStream(modPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, useAsync: true);
 
         while (true)
         {
             // Read the next chunk from both files and compare lengths first for early exit
-            var vanillaRead = vanillaStream.Read(vanillaBuffer, 0, bufferSize);
-            var modRead = modStream.Read(modBuffer, 0, bufferSize);
+            var vanillaRead = await vanillaStream.ReadAsync(vanillaBuffer.AsMemory(0, bufferSize), ctx);
+            var modRead = await modStream.ReadAsync(modBuffer.AsMemory(0, bufferSize), ctx);
 
             if (vanillaRead != modRead)
                 return true;

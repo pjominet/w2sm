@@ -5,8 +5,8 @@ namespace W2ScriptMerger.Models;
 public class DzipConflict
 {
     public required string DzipName { get; init; }
-    public required string VanillaDzipPath { get; init; }
-    public string VanillaExtractedPath { get; init; } = string.Empty;
+    public required string BaseDzipPath { get; init; }
+    public string BaseExtractionPath { get; init; } = string.Empty;
     public bool IsAddedByMod { get; init; }
     public List<ModDzipSource> ModSources { get; } = [];
     public List<ScriptFileConflict> ScriptConflicts { get; } = [];

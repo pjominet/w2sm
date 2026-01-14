@@ -12,6 +12,8 @@ public class ScriptMergeServiceTests : IDisposable
     private readonly TestArtifactScope _scope;
     private readonly string _workspace;
 
+    private readonly ScriptMergeService _mergeService;
+
     static ScriptMergeServiceTests()
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -21,6 +23,17 @@ public class ScriptMergeServiceTests : IDisposable
     {
         _scope = TestArtifactScope.Create(nameof(ScriptMergeServiceTests));
         _workspace = _scope.CreateSubdirectory("workspace");
+
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true
+        };
+        var configService = new ConfigService(options)
+        {
+            RuntimeDataPath = _workspace
+        };
+        var extractionService = new ScriptExtractionService(configService);
+        _mergeService = new ScriptMergeService(extractionService);
     }
 
     public void Dispose() => _scope.Dispose();
@@ -68,18 +81,7 @@ public class ScriptMergeServiceTests : IDisposable
             ScriptPath = modPath
         });
 
-        var options = new JsonSerializerOptions
-        {
-            WriteIndented = true
-        };
-        var configService = new ConfigService(options)
-        {
-            RuntimeDataPath = _workspace
-        };
-        var extractionService = new ScriptExtractionService(configService);
-        var mergeService = new ScriptMergeService(extractionService);
-
-        var result = mergeService.AttemptAutoMerge(conflict);
+        var result = _mergeService.AttemptAutoMerge(conflict);
 
         Assert.True(result.Success);
         Assert.NotNull(result.MergedContent);
@@ -119,18 +121,7 @@ public class ScriptMergeServiceTests : IDisposable
         };
         conflict.ModVersions.Add(new ModScriptVersion { ModName = "TestMod", ScriptPath = modPath });
 
-        var options = new JsonSerializerOptions
-        {
-            WriteIndented = true
-        };
-        var configService = new ConfigService(options)
-        {
-            RuntimeDataPath = _workspace
-        };
-        var extractionService = new ScriptExtractionService(configService);
-        var mergeService = new ScriptMergeService(extractionService);
-
-        var result = mergeService.AttemptAutoMerge(conflict);
+        var result = _mergeService.AttemptAutoMerge(conflict);
 
         Assert.True(result.Success);
         var mergedText = Encoding.GetEncoding(1250).GetString(result.MergedContent!);

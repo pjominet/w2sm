@@ -85,7 +85,7 @@ public partial class MainViewModel
         if (LoadedMods.Count == 0)
             return;
 
-        var conflicts = await Task.Run(async () => await _conflictDetectionService.DetectConflictsAsync(LoadedMods.ToList(), CancellationToken.None));
+        var conflicts = await _conflictDetectionService.DetectConflictsAsync(LoadedMods.ToList(), CancellationToken.None);
 
         _extractionService.LoadExistingMerges(conflicts);
 

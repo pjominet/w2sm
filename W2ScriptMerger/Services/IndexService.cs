@@ -65,7 +65,14 @@ public class IndexService(ConfigService configService)
 
     internal bool IsVanillaDzip(string dzipName) => _gameFilesIndex.ContainsKey(dzipName);
 
-    internal string? GetGameDzipPath(string dzipName) => _gameFilesIndex.GetValueOrDefault(dzipName)?.RelativePath;
+    internal string? GetGameDzipPath(string dzipName)
+    {
+        var  relativePath = _gameFilesIndex.GetValueOrDefault(dzipName)?.RelativePath;
+        if (configService.GameCookedPCPath.HasValue() && relativePath.HasValue())
+            return Path.Combine(configService.GameCookedPCPath, relativePath);
+
+        return null;
+    }
 
     private async Task LoadGameFilesIndex(CancellationToken ctx = default)
     {

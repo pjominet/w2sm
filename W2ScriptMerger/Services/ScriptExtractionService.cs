@@ -22,18 +22,19 @@ public class ScriptExtractionService(ConfigService configService)
         await DzipService.UnpackDzipToAsync(modDzipPath.ToSystemPath(), modExtractPath, ctx);
     }
 
-    internal string GetVanillaExtractedPath(string dzipName) => Path.Combine(GameScriptsPath, dzipName);
+    internal string GetGameFileExtractionPath(string dzipName) => Path.Combine(GameScriptsPath, dzipName);
 
-    internal string GetModExtractedPath(string modName, string dzipName) => Path.Combine(ModScriptsPath, modName, dzipName);
+    internal string GetModFileExtractionPath(string modName, string dzipName) => Path.Combine(ModScriptsPath, modName, dzipName);
 
-    internal List<string> GetExtractedScripts(string extractedDzipPath)
+    internal async Task<List<string>> GetExtractedScriptsAsync(string extractedDzipPath, CancellationToken ctx = default)
     {
         if (!Directory.Exists(extractedDzipPath))
             return [];
 
-        return Directory.GetFiles(extractedDzipPath, "*.ws", SearchOption.AllDirectories)
-            .Select(f => Path.GetRelativePath(extractedDzipPath, f))
-            .ToList();
+        return await Task.Run(() =>
+            Directory.GetFiles(extractedDzipPath, "*.ws", SearchOption.AllDirectories)
+                .Select(f => Path.GetRelativePath(extractedDzipPath, f))
+                .ToList(), ctx);
     }
 
     private void EnsureMergedScriptsFolder() => Directory.CreateDirectory(MergedScriptsPath);
