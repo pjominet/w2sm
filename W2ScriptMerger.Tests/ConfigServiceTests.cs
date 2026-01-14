@@ -2,15 +2,12 @@ using System.IO;
 using System.Text.Json;
 using W2ScriptMerger.Services;
 using W2ScriptMerger.Tests.Infrastructure;
+using W2ScriptMerger.Tools;
 
 namespace W2ScriptMerger.Tests;
 
 public class ConfigServiceTests : IDisposable
 {
-    private const string StagingFolder = "mod_staging";
-    private const string VanillaScriptsFolder = "vanilla_scripts";
-    private const string ModScriptsFolder = "mod_scripts";
-
     private readonly TestArtifactScope _scope;
     private readonly string _sourcePath;
     private readonly string _destPath;
@@ -32,9 +29,9 @@ public class ConfigServiceTests : IDisposable
         var configService = new ConfigService(_options) { RuntimeDataPath = _sourcePath };
 
         // Create test folders with files
-        var stagingFolder = Path.Combine(_sourcePath, StagingFolder);
-        var vanillaFolder = Path.Combine(_sourcePath, VanillaScriptsFolder);
-        var modFolder = Path.Combine(_sourcePath, ModScriptsFolder);
+        var stagingFolder = Path.Combine(_sourcePath, Constants.STAGING_FOLDER);
+        var vanillaFolder = Path.Combine(_sourcePath, Constants.GAME_SCRIPTS_FOLDER);
+        var modFolder = Path.Combine(_sourcePath, Constants.MOD_SCRIPTS_FOLDER);
 
         Directory.CreateDirectory(stagingFolder);
         Directory.CreateDirectory(vanillaFolder);
@@ -48,9 +45,9 @@ public class ConfigServiceTests : IDisposable
         configService.MigrateRuntimeData(_destPath);
 
         // Assert - files exist in new location
-        Assert.True(File.Exists(Path.Combine(_destPath, StagingFolder, "test_mod.txt")));
-        Assert.True(File.Exists(Path.Combine(_destPath, VanillaScriptsFolder, "vanilla.ws")));
-        Assert.True(File.Exists(Path.Combine(_destPath, ModScriptsFolder, "mod.ws")));
+        Assert.True(File.Exists(Path.Combine(_destPath, Constants.STAGING_FOLDER, "test_mod.txt")));
+        Assert.True(File.Exists(Path.Combine(_destPath, Constants.GAME_SCRIPTS_FOLDER, "vanilla.ws")));
+        Assert.True(File.Exists(Path.Combine(_destPath, Constants.MOD_SCRIPTS_FOLDER, "mod.ws")));
 
         // Assert - files removed from old location
         Assert.False(Directory.Exists(stagingFolder));
@@ -67,7 +64,7 @@ public class ConfigServiceTests : IDisposable
         // Arrange
         var configService = new ConfigService(_options) { RuntimeDataPath = _sourcePath };
 
-        var nestedPath = Path.Combine(_sourcePath, StagingFolder, "mod1", "subfolder");
+        var nestedPath = Path.Combine(_sourcePath, Constants.STAGING_FOLDER, "mod1", "subfolder");
         Directory.CreateDirectory(nestedPath);
         File.WriteAllText(Path.Combine(nestedPath, "nested_file.txt"), "nested content");
 
@@ -75,7 +72,7 @@ public class ConfigServiceTests : IDisposable
         configService.MigrateRuntimeData(_destPath);
 
         // Assert
-        var destNestedFile = Path.Combine(_destPath, StagingFolder, "mod1", "subfolder", "nested_file.txt");
+        var destNestedFile = Path.Combine(_destPath, Constants.STAGING_FOLDER, "mod1", "subfolder", "nested_file.txt");
         Assert.True(File.Exists(destNestedFile));
         Assert.Equal("nested content", File.ReadAllText(destNestedFile));
     }
@@ -87,7 +84,7 @@ public class ConfigServiceTests : IDisposable
         var configService = new ConfigService(_options) { RuntimeDataPath = _sourcePath };
 
         // Only create staging folder, not others
-        var stagingFolder = Path.Combine(_sourcePath, StagingFolder);
+        var stagingFolder = Path.Combine(_sourcePath, Constants.STAGING_FOLDER);
         Directory.CreateDirectory(stagingFolder);
         File.WriteAllText(Path.Combine(stagingFolder, "test.txt"), "content");
 
@@ -95,7 +92,7 @@ public class ConfigServiceTests : IDisposable
         configService.MigrateRuntimeData(_destPath);
 
         // Assert
-        Assert.True(File.Exists(Path.Combine(_destPath, StagingFolder, "test.txt")));
+        Assert.True(File.Exists(Path.Combine(_destPath, Constants.STAGING_FOLDER, "test.txt")));
         Assert.Equal(_destPath, configService.RuntimeDataPath);
     }
 
@@ -105,7 +102,7 @@ public class ConfigServiceTests : IDisposable
         // Arrange
         var configService = new ConfigService(_options) { RuntimeDataPath = _sourcePath };
 
-        var stagingFolder = Path.Combine(_sourcePath, StagingFolder);
+        var stagingFolder = Path.Combine(_sourcePath, Constants.STAGING_FOLDER);
         Directory.CreateDirectory(stagingFolder);
         File.WriteAllText(Path.Combine(stagingFolder, "test.txt"), "content");
 
@@ -113,7 +110,7 @@ public class ConfigServiceTests : IDisposable
         configService.MigrateRuntimeData(_sourcePath);
 
         // Assert - files still in original location
-        Assert.True(File.Exists(Path.Combine(_sourcePath, StagingFolder, "test.txt")));
+        Assert.True(File.Exists(Path.Combine(_sourcePath, Constants.STAGING_FOLDER, "test.txt")));
     }
 
     [Fact]
@@ -123,12 +120,12 @@ public class ConfigServiceTests : IDisposable
         var configService = new ConfigService(_options) { RuntimeDataPath = _sourcePath };
 
         // Create source folder with file
-        var sourceStaging = Path.Combine(_sourcePath, StagingFolder);
+        var sourceStaging = Path.Combine(_sourcePath, Constants.STAGING_FOLDER);
         Directory.CreateDirectory(sourceStaging);
         File.WriteAllText(Path.Combine(sourceStaging, "new_file.txt"), "new content");
 
         // Create destination folder with different file
-        var destStaging = Path.Combine(_destPath, StagingFolder);
+        var destStaging = Path.Combine(_destPath, Constants.STAGING_FOLDER);
         Directory.CreateDirectory(destStaging);
         File.WriteAllText(Path.Combine(destStaging, "old_file.txt"), "old content");
 
@@ -136,7 +133,7 @@ public class ConfigServiceTests : IDisposable
         configService.MigrateRuntimeData(_destPath);
 
         // Assert - new file exists, old file removed (folder was replaced)
-        Assert.True(File.Exists(Path.Combine(_destPath, StagingFolder, "new_file.txt")));
-        Assert.False(File.Exists(Path.Combine(_destPath, StagingFolder, "old_file.txt")));
+        Assert.True(File.Exists(Path.Combine(_destPath, Constants.STAGING_FOLDER, "new_file.txt")));
+        Assert.False(File.Exists(Path.Combine(_destPath, Constants.STAGING_FOLDER, "old_file.txt")));
     }
 }
