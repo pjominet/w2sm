@@ -22,18 +22,20 @@ $allTags = git tag --sort=-creatordate
 $previousTag = $allTags | Where-Object { $_ -ne $currentTag } | Select-Object -First 1
 
 if ([string]::IsNullOrWhiteSpace($previousTag)) {
-    $logEntries = git log --pretty="%s"
+    $logEntries = git log --pretty="%s" | Out-String
 } else {
-    $logEntries = git log "$previousTag..HEAD" --pretty="%s"
+    $logEntries = git log "$previousTag..HEAD" --pretty="%s" | Out-String
 }
 
-echo "Previous tag: $previousTag"
-echo "Current tag: $currentTag"
-echo "Log entries: $logEntries"
-echo "Ignored commits containing: $IgnoredCommits"
+Write-Host "Previous tag: $previousTag"
+Write-Host "Current tag: $currentTag"
+Write-Host "Ignored commits containing: " + [string]::Join($IgnoredCommits, ", ")
+
+# Split the log entries into an array of lines
+$logEntriesArray = $logEntries -split "`r`n" | Where-Object { $_ -match '\S' }
 
 $filteredEntries = @()
-foreach ($entry in $logEntries) {
+foreach ($entry in $logEntriesArray) {
     $trimmed = $entry.Trim()
     if (-not $trimmed) {
         continue
