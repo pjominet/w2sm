@@ -42,13 +42,13 @@ public class ConfigService
     }
 
     public string ModStagingPath => Path.Combine(RuntimeDataPath, Constants.STAGING_FOLDER);
-    public string VanillaScriptsPath => Path.Combine(RuntimeDataPath, Constants.VANILLA_SCRIPTS_FOLDER);
+    public string VanillaScriptsPath => Path.Combine(RuntimeDataPath, Constants.GAME_SCRIPTS_FOLDER);
     public string ModScriptsPath => Path.Combine(RuntimeDataPath, Constants.MOD_SCRIPTS_FOLDER);
 
     private static string[] RuntimeFolders =>
     [
         Constants.STAGING_FOLDER,
-        Constants.VANILLA_SCRIPTS_FOLDER,
+        Constants.GAME_SCRIPTS_FOLDER,
         Constants.MOD_SCRIPTS_FOLDER
     ];
 

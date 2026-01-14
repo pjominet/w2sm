@@ -5,49 +5,11 @@ using W2ScriptMerger.Tools;
 
 namespace W2ScriptMerger.Services;
 
-public class ScriptExtractionService(ConfigService configService, IndexerService indexerService)
+public class ScriptExtractionService(ConfigService configService)
 {
     private string VanillaScriptsPath => configService.VanillaScriptsPath;
     private string ModScriptsPath => configService.ModScriptsPath;
     public string MergedScriptsPath => Path.Combine(configService.ModStagingPath, Constants.MERGED_SCRIPTS_FOLDER);
-
-    private readonly Dictionary<string, string> _vanillaDzipIndex = new(StringComparer.OrdinalIgnoreCase);
-
-    internal async Task ExtractVanillaScriptsAsync(CancellationToken ctx = default)
-    {
-        var cookedPcPath = configService.GameCookedPCPath;
-        if (string.IsNullOrEmpty(cookedPcPath) || !Directory.Exists(cookedPcPath))
-            return;
-
-        // Ensure vanilla files are indexed
-        await indexerService.IndexVanillaFiles(ctx);
-
-        Directory.CreateDirectory(VanillaScriptsPath);
-        _vanillaDzipIndex.Clear();
-
-        // Process dzips for script extraction
-        var dzipFiles = Directory.GetFiles(cookedPcPath, "*.dzip", SearchOption.TopDirectoryOnly);
-        var tasks = dzipFiles.Select(async dzipPath =>
-        {
-            var dzipName = Path.GetFileName(dzipPath);
-
-            if (!indexerService.IsVanillaDzip(dzipName))
-                return;
-
-            _vanillaDzipIndex[dzipName] = dzipPath;
-            await ExtractDzipAsync(dzipPath, dzipName, ctx);
-        });
-        await Task.WhenAll(tasks);
-    }
-
-    private async Task ExtractDzipAsync(string dzipPath, string dzipName, CancellationToken ctx)
-    {
-        var extractPath = Path.Combine(VanillaScriptsPath, dzipName);
-        if (Directory.Exists(extractPath))
-            return;
-
-        await DzipService.UnpackDzipToAsync(dzipPath, extractPath, ctx);
-    }
 
     internal async Task ExtractModDzipForConflictAsync(string modName, string modDzipPath, string dzipName, CancellationToken ctx)
     {
@@ -59,11 +21,6 @@ public class ScriptExtractionService(ConfigService configService, IndexerService
 
         await DzipService.UnpackDzipToAsync(modDzipPath.ToSystemPath(), modExtractPath, ctx);
     }
-
-    internal bool IsVanillaDzip(string dzipName) => _vanillaDzipIndex.ContainsKey(dzipName);
-
-    internal string? GetVanillaDzipPath(string dzipName) =>
-        _vanillaDzipIndex.GetValueOrDefault(dzipName);
 
     internal string GetVanillaExtractedPath(string dzipName) => Path.Combine(VanillaScriptsPath, dzipName);
 

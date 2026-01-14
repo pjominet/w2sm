@@ -14,7 +14,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly ConfigService _configService;
     private readonly ArchiveService _archiveService;
-    private readonly IndexerService _indexerService;
+    private readonly IndexService _indexService;
     private readonly ScriptExtractionService _extractionService;
     private readonly ConflictDetectionService _conflictDetectionService;
     private readonly ScriptMergeService _mergeService;
@@ -69,9 +69,9 @@ public partial class MainViewModel : ObservableObject
     {
         _loggingService = new LoggingService();
         _configService = new ConfigService(_jsonSerializerOptions);
-        _indexerService = new IndexerService(_configService);
-        _extractionService = new ScriptExtractionService(_configService, _indexerService);
-        _conflictDetectionService = new ConflictDetectionService(_extractionService);
+        _indexService = new IndexService(_configService);
+        _extractionService = new ScriptExtractionService(_configService);
+        _conflictDetectionService = new ConflictDetectionService(_extractionService, _indexService);
         _mergeService = new ScriptMergeService(_extractionService);
         _archiveService = new ArchiveService(_configService);
         _deploymentService = new DeploymentService(_configService, _extractionService);
@@ -90,7 +90,7 @@ public partial class MainViewModel : ObservableObject
         Log("Game path validated. Indexing vanilla files...");
         Task.Run(async () =>
         {
-            await ExtractVanillaScripts();
+            await IndexGameFiles();
             await DetectStagedMods();
         });
     }

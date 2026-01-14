@@ -92,7 +92,7 @@ public class ArchiveService(ConfigService configService)
         // Create ModFile reference
         lock (modArchive.Files)
         {
-            modArchive.Files.Add(new ModFile
+            modArchive.Files.Add(new GameFile
             {
                 RelativePath = relativePathWithRoot
             });

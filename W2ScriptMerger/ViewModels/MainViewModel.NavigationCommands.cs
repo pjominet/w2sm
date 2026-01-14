@@ -30,7 +30,7 @@ public partial class MainViewModel
             {
                 Log($"Game path set: {GamePath}");
                 UserContentPath = _configService.UserContentPath;
-                await ExtractVanillaScripts();
+                await IndexGameFiles();
                 await DetectStagedMods();
             }
             else

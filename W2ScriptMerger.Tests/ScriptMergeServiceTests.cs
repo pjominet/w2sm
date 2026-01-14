@@ -76,8 +76,7 @@ public class ScriptMergeServiceTests : IDisposable
         {
             RuntimeDataPath = _workspace
         };
-        var vanillaIndexService = new IndexerService(configService);
-        var extractionService = new ScriptExtractionService(configService, vanillaIndexService);
+        var extractionService = new ScriptExtractionService(configService);
         var mergeService = new ScriptMergeService(extractionService);
 
         var result = mergeService.AttemptAutoMerge(conflict);
@@ -128,8 +127,7 @@ public class ScriptMergeServiceTests : IDisposable
         {
             RuntimeDataPath = _workspace
         };
-        var vanillaIndexService = new IndexerService(configService);
-        var extractionService = new ScriptExtractionService(configService, vanillaIndexService);
+        var extractionService = new ScriptExtractionService(configService);
         var mergeService = new ScriptMergeService(extractionService);
 
         var result = mergeService.AttemptAutoMerge(conflict);

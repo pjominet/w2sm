@@ -3,19 +3,19 @@ using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
-internal class ConflictDetectionService(ScriptExtractionService extractionService)
+internal class ConflictDetectionService(ScriptExtractionService extractionService, IndexService indexService)
 {
     private readonly Dictionary<string, DzipConflict> _conflicts = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task<List<DzipConflict>> DetectConflictsAsync(IEnumerable<ModArchive> mods, CancellationToken ctx = default)
     {
         _conflicts.Clear();
-        var modDzipSources = new Dictionary<string, List<(ModArchive Mod, ModFile File)>>(StringComparer.OrdinalIgnoreCase);
+        var modDzipSources = new Dictionary<string, List<(ModArchive Mod, GameFile File)>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var mod in mods)
         {
             ctx.ThrowIfCancellationRequested();
-            foreach (var file in mod.Files.Where(f => f.Type == ModFileType.Dzip))
+            foreach (var file in mod.Files.Where(f => f.Type == FileType.Dzip))
             {
                 var dzipName = file.Name;
                 if (!modDzipSources.TryGetValue(dzipName, out var sources))
@@ -32,7 +32,7 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
         // 2. Mod-added dzips that 2+ mods provide (conflict between mods)
         foreach (var (dzipName, sources) in modDzipSources)
         {
-            var isVanillaDzip = extractionService.IsVanillaDzip(dzipName);
+            var isVanillaDzip = indexService.IsVanillaDzip(dzipName);
 
             switch (isVanillaDzip)
             {
@@ -43,7 +43,7 @@ internal class ConflictDetectionService(ScriptExtractionService extractionServic
                     continue;
             }
 
-            var vanillaDzipPath = extractionService.GetVanillaDzipPath(dzipName);
+            var vanillaDzipPath = indexService.GetGameDzipPath(dzipName);
             string vanillaExtractedPath;
 
             if (isVanillaDzip && vanillaDzipPath is not null)

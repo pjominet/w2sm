@@ -25,17 +25,17 @@ public partial class MainViewModel
         _loggingService.Log(message);
     }
 
-    private async Task ExtractVanillaScripts()
+    private async Task IndexGameFiles()
     {
         await Task.Run(async () =>
         {
-            await _extractionService.ExtractVanillaScriptsAsync();
+            await _indexService.IndexGameFiles();
             Application.Current.Dispatcher.Invoke(() =>
             {
-                var modDzipMsg = _indexerService.ModDzipCount > 0
-                    ? $", {_indexerService.ModDzipCount} mod dzips"
+                var modDzipMsg = _indexService.ModDzipCount > 0
+                    ? $", {_indexService.ModDzipCount} mod dzips"
                     : "";
-                Log($"Indexed {_indexerService.VanillaDzipCount} vanilla dzips{modDzipMsg}");
+                Log($"Indexed {_indexService.GameDzipCount} vanilla dzips{modDzipMsg}");
                 StatusMessage = "Ready - Files indexed";
             });
         });

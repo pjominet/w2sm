@@ -40,7 +40,7 @@ public class ArchiveServiceTests : IDisposable
 
         Assert.True(result.IsLoaded, result.Error);
         Assert.NotEmpty(result.Files);
-        Assert.Contains(result.Files, f => f.Type is ModFileType.Dzip);
+        Assert.Contains(result.Files, f => f.Type is FileType.Dzip);
     }
 
     [Fact]
