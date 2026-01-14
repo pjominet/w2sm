@@ -10,7 +10,7 @@ internal class LoggingService
     private string CurrentLogFile { get; }
     private readonly Lock _lock = new();
 
-    public LoggingService()
+    internal LoggingService()
     {
         var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
         LogsDirectory = Path.Combine(baseDirectory, "log");
@@ -28,7 +28,7 @@ internal class LoggingService
         WriteLine(header);
     }
 
-    public void Log(string message)
+    internal void Log(string message)
     {
         WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
     }

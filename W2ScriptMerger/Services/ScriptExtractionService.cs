@@ -11,7 +11,7 @@ public class ScriptExtractionService(ConfigService configService)
     private string ModScriptsPath => configService.ModScriptsPath;
     public string MergedScriptsPath => Path.Combine(configService.ModStagingPath, Constants.MERGED_SCRIPTS_FOLDER);
 
-    internal async Task ExtractModDzipForConflictAsync(string modName, string modDzipPath, string dzipName, CancellationToken ctx)
+    public async Task ExtractModDzipForConflictAsync(string modName, string modDzipPath, string dzipName, CancellationToken ctx)
     {
         Directory.CreateDirectory(ModScriptsPath);
 
@@ -22,11 +22,11 @@ public class ScriptExtractionService(ConfigService configService)
         await DzipService.UnpackDzipToAsync(modDzipPath.ToSystemPath(), modExtractPath, ctx);
     }
 
-    internal string GetGameFileExtractionPath(string dzipName) => Path.Combine(GameScriptsPath, dzipName);
+    public string GetGameFileExtractionPath(string dzipName) => Path.Combine(GameScriptsPath, dzipName);
 
-    internal string GetModFileExtractionPath(string modName, string dzipName) => Path.Combine(ModScriptsPath, modName, dzipName);
+    public string GetModFileExtractionPath(string modName, string dzipName) => Path.Combine(ModScriptsPath, modName, dzipName);
 
-    internal async Task<List<string>> GetExtractedScriptsAsync(string extractedDzipPath, CancellationToken ctx = default)
+    public async Task<List<string>> GetExtractedScriptsAsync(string extractedDzipPath, CancellationToken ctx = default)
     {
         if (!Directory.Exists(extractedDzipPath))
             return [];

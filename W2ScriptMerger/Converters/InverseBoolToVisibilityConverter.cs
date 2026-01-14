@@ -4,7 +4,7 @@ using System.Windows.Data;
 
 namespace W2ScriptMerger.Converters;
 
-public class InverseBoolToVisibilityConverter : IValueConverter
+internal class InverseBoolToVisibilityConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {

@@ -4,7 +4,7 @@ using W2ScriptMerger.Models;
 
 namespace W2ScriptMerger.Services;
 
-internal class ConflictDetectionService(ScriptExtractionService extractionService, IndexService indexService)
+public class ConflictDetectionService(ScriptExtractionService extractionService, IndexService indexService)
 {
     private readonly Dictionary<string, DzipConflict> _conflicts = new(StringComparer.OrdinalIgnoreCase);
 

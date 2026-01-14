@@ -6,7 +6,7 @@ using W2ScriptMerger.Tools;
 
 namespace W2ScriptMerger.Services;
 
-internal class DeploymentService(ConfigService configService, ScriptExtractionService extractionService)
+public class DeploymentService(ConfigService configService, ScriptExtractionService extractionService)
 {
     public void DeployMod(ModArchive mod, HashSet<string> mergedDzipNames, CancellationToken ctx = default)
     {
