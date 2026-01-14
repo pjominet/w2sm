@@ -7,7 +7,7 @@ namespace W2ScriptMerger.Services;
 
 public class ScriptExtractionService(ConfigService configService)
 {
-    private string VanillaScriptsPath => configService.VanillaScriptsPath;
+    private string GameScriptsPath => configService.GameScriptsPath;
     private string ModScriptsPath => configService.ModScriptsPath;
     public string MergedScriptsPath => Path.Combine(configService.ModStagingPath, Constants.MERGED_SCRIPTS_FOLDER);
 
@@ -22,7 +22,7 @@ public class ScriptExtractionService(ConfigService configService)
         await DzipService.UnpackDzipToAsync(modDzipPath.ToSystemPath(), modExtractPath, ctx);
     }
 
-    internal string GetVanillaExtractedPath(string dzipName) => Path.Combine(VanillaScriptsPath, dzipName);
+    internal string GetVanillaExtractedPath(string dzipName) => Path.Combine(GameScriptsPath, dzipName);
 
     internal string GetModExtractedPath(string modName, string dzipName) => Path.Combine(ModScriptsPath, modName, dzipName);
 
@@ -127,7 +127,7 @@ public class ScriptExtractionService(ConfigService configService)
             return null;
 
         // Get vanilla extraction path - contains ALL original files
-        var vanillaDir = Path.Combine(VanillaScriptsPath, dzipName);
+        var vanillaDir = Path.Combine(GameScriptsPath, dzipName);
         if (!Directory.Exists(vanillaDir))
             return null;
 

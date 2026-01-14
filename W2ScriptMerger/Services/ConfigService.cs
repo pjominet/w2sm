@@ -17,6 +17,7 @@ public class ConfigService
         JsonSerializerOptions = options;
         _configPath = Path.Combine(Constants.APP_BASE_PATH, Constants.CONFIG_FILENAME);
         Config = Load();
+        Save(); // make sure defaults are synced back after loading
     }
 
     public JsonSerializerOptions JsonSerializerOptions { get; }
@@ -42,7 +43,7 @@ public class ConfigService
     }
 
     public string ModStagingPath => Path.Combine(RuntimeDataPath, Constants.STAGING_FOLDER);
-    public string VanillaScriptsPath => Path.Combine(RuntimeDataPath, Constants.GAME_SCRIPTS_FOLDER);
+    public string GameScriptsPath => Path.Combine(RuntimeDataPath, Constants.GAME_SCRIPTS_FOLDER);
     public string ModScriptsPath => Path.Combine(RuntimeDataPath, Constants.MOD_SCRIPTS_FOLDER);
 
     private static string[] RuntimeFolders =>
@@ -128,19 +129,22 @@ public class ConfigService
 
     private AppConfig Load()
     {
+        AppConfig config = new();
         try
         {
             if (File.Exists(_configPath))
             {
                 var json = File.ReadAllText(_configPath);
-                return JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
+                config = JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
             }
         }
-        catch
-        {
-            // Ignore errors, return default config
-        }
-        return new AppConfig();
+        catch { /* Ignore errors, fall back to defaults */}
+
+        // make sure default values are set if they haven't been changed manually
+        config.RuntimeDataPath ??= Constants.APP_BASE_PATH;
+        config.UserContentPath ??= Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Witcher 2", "UserContent");
+
+        return config;
     }
 
     private void Save()
@@ -150,9 +154,6 @@ public class ConfigService
             var json = JsonSerializer.Serialize(Config, JsonSerializerOptions);
             File.WriteAllText(_configPath, json);
         }
-        catch
-        {
-            // Ignore save errors
-        }
+        catch { /* Ignore save errors */ }
     }
 }
