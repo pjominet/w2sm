@@ -93,7 +93,7 @@ public class ConfigService
         }
     }
 
-    public string? GameCookedPCPath => Config.GamePath.HasValue() ? null : Path.Combine(Config.GamePath!, "CookedPC");
+    public string? GameCookedPCPath => Config.GamePath.HasValue() ? Path.Combine(Config.GamePath, "CookedPC") : null;
 
     public string? LastModDirectory
     {

@@ -13,7 +13,7 @@ public class ScriptExtractionService(ConfigService configService, IndexerService
 
     private readonly Dictionary<string, string> _vanillaDzipIndex = new(StringComparer.OrdinalIgnoreCase);
 
-    public async Task ExtractVanillaScriptsAsync(CancellationToken ctx = default)
+    internal async Task ExtractVanillaScriptsAsync(CancellationToken ctx = default)
     {
         var cookedPcPath = configService.GameCookedPCPath;
         if (string.IsNullOrEmpty(cookedPcPath) || !Directory.Exists(cookedPcPath))
@@ -44,9 +44,6 @@ public class ScriptExtractionService(ConfigService configService, IndexerService
     {
         var extractPath = Path.Combine(VanillaScriptsPath, dzipName);
         if (Directory.Exists(extractPath))
-            return;
-
-        if (!DzipContainsScripts(dzipPath))
             return;
 
         await DzipService.UnpackDzipToAsync(dzipPath, extractPath, ctx);
@@ -211,18 +208,5 @@ public class ScriptExtractionService(ConfigService configService, IndexerService
     {
         if (Directory.Exists(ModScriptsPath))
             Directory.Delete(ModScriptsPath, true);
-    }
-
-    private static bool DzipContainsScripts(string dzipPath)
-    {
-        try
-        {
-            var entries = DzipService.ListEntries(dzipPath);
-            return entries.Any(e => e.Name.EndsWith(".ws", StringComparison.OrdinalIgnoreCase));
-        }
-        catch
-        {
-            return false;
-        }
     }
 }
