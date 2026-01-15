@@ -229,7 +229,8 @@
                     <Button x:Name="DebugMergeEditorButton" Content="✏ Debug Merge Editor" Command="{Binding OpenDebugMergeEditorCommand}"
                             Style="{StaticResource AccentButton}" Margin="0,0,8,0"
                             IsEnabled="{Binding HasUnresolvedConflicts}"/>
-                    <Button x:Name="ViewDiffButton" Content="👁 View Diff" Command="{Binding ViewDiffCommand}" Style="{StaticResource DarkButton}" Visibility="Collapsed"/>
+                    <Button x:Name="ViewDiffButton" Content="👁 View Diff" Command="{Binding ViewDiffCommand}" Style="{StaticResource DarkButton}"
+                            Visibility="Collapsed" Margin="0,0,8,0"/>
                     <Button Content="📋 View Merge Summary" Command="{Binding ViewMergeSummaryCommand}" Style="{StaticResource SuccessButton}"
                             Visibility="{Binding HasExistingMerge, Converter={StaticResource BoolToVis}}" Margin="0,0,8,0"/>
                 </StackPanel>
