@@ -16,7 +16,8 @@ public class ConflictDetectionService(ScriptExtractionService extractionService,
         foreach (var mod in mods)
         {
             ctx.ThrowIfCancellationRequested();
-            foreach (var file in mod.Files.Where(f => f.Type == FileType.Dzip))
+            // Capture every DZIP provided by the mod so we can reason about conflicts per archive name
+            foreach (var file in mod.Files.Where(f => f.Type is FileType.Dzip))
             {
                 var dzipName = file.Name;
                 if (!modDzipSources.TryGetValue(dzipName, out var sources))
@@ -24,58 +25,42 @@ public class ConflictDetectionService(ScriptExtractionService extractionService,
                     sources = [];
                     modDzipSources[dzipName] = sources;
                 }
+
                 sources.Add((mod, file));
             }
         }
 
-        // Second pass: create conflicts only for:
-        // 1. Vanilla dzips that any mod modifies
-        // 2. Mod-added dzips that 2+ mods provide (conflict between mods)
+        // Create conflicts only for:
+        // 1. Vanilla dzips touched by at least one CookedPC (or unknown) mod
+        // 2. Mod-added dzips where two or more mods within the same install root ship the same archive
         foreach (var (dzipName, sources) in modDzipSources)
         {
             var isVanillaDzip = indexService.IsVanillaDzip(dzipName);
 
-            switch (isVanillaDzip)
+            if (isVanillaDzip)
             {
-                // For mod-added, we need 2+ mods to create a conflict
-                case false when sources.Count < 2:
-                // Vanilla dzips need at only one mod to create a conflict
-                case true when sources.Count < 1:
+                // Vanilla comparisons only make sense for CookedPC mods; UserContent mods should not be diffed against vanilla files.
+                var cookedSources = sources
+                    .Where(s => NormalizeInstallLocation(s.Mod.ModInstallLocation) is InstallLocation.CookedPC)
+                    .ToList();
+
+                if (cookedSources.Count == 0)
                     continue;
+
+                CreateConflict(dzipName, InstallLocation.CookedPC, cookedSources, isVanillaDzip);
+                continue;
             }
 
-            var dzipPath = indexService.GetGameDzipPath(dzipName);
-            string extractionPath;
-
-            if (isVanillaDzip && dzipPath is not null)
-                extractionPath = extractionService.GetGameFileExtractionPath(dzipName);
-            else
+            foreach (var group in sources.GroupBy(s => NormalizeInstallLocation(s.Mod.ModInstallLocation)))
             {
-                // For mod-added dzips, use the first mod's version as the "base"
-                var firstSource = sources[0];
-                dzipPath = Path.Combine(firstSource.Mod.StagingPath, firstSource.File.RelativePath);
-                extractionPath = extractionService.GetModFileExtractionPath(firstSource.Mod.ModName, dzipName);
-            }
+                var location = group.Key;
+                var groupedSources = group.ToList();
 
-            var conflict = new DzipConflict
-            {
-                DzipName = dzipName,
-                BaseDzipPath = dzipPath,
-                BaseExtractionPath = extractionPath,
-                IsAddedByMod = !isVanillaDzip
-            };
-            _conflicts[dzipName] = conflict;
+                // For mod-added dzips, only compare mods living in the same install root (CookedPC or UserContent).
+                if (groupedSources.Count < 2)
+                    continue;
 
-            foreach (var (mod, file) in sources)
-            {
-                var modDzipPath = Path.Combine(mod.StagingPath, file.RelativePath.ToSystemPath());
-                conflict.ModSources.Add(new ModDzipSource
-                {
-                    ModName = mod.ModName,
-                    DisplayName = mod.DisplayName,
-                    DzipPath = modDzipPath,
-                    ExtractedPath = extractionService.GetModFileExtractionPath(mod.ModName, dzipName)
-                });
+                CreateConflict(dzipName, location, groupedSources, isVanillaDzip);
             }
         }
 
@@ -85,6 +70,52 @@ public class ConflictDetectionService(ScriptExtractionService extractionService,
         // Filter out conflicts with no script changes
         return _conflicts.Values.Where(c => c.ScriptConflicts.Count > 0).ToList();
     }
+
+    private void CreateConflict(string dzipName, InstallLocation location, List<(ModArchive Mod, GameFile File)> sources, bool isVanillaDzip)
+    {
+        var conflictKey = BuildConflictKey(dzipName, location);
+
+        // Vanilla conflicts use the actual game file; mod-added conflicts use the first mod as the merge base.
+        var dzipPath = isVanillaDzip ? indexService.GetGameDzipPath(dzipName) : null;
+        string extractionPath;
+
+        if (isVanillaDzip && dzipPath is not null)
+            extractionPath = extractionService.GetGameFileExtractionPath(dzipName);
+        else
+        {
+            // For mod-added dzips, or when vanilla path is missing, use the first mod's version as the "base"
+            var firstSource = sources[0];
+            dzipPath = Path.Combine(firstSource.Mod.StagingPath, firstSource.File.RelativePath);
+            extractionPath = extractionService.GetModFileExtractionPath(firstSource.Mod.ModName, dzipName);
+        }
+
+        var conflict = new DzipConflict
+        {
+            DzipName = dzipName,
+            BaseDzipPath = dzipPath,
+            BaseExtractionPath = extractionPath,
+            IsAddedByMod = !isVanillaDzip
+        };
+
+        foreach (var (mod, file) in sources)
+        {
+            var modDzipPath = Path.Combine(mod.StagingPath, file.RelativePath.ToSystemPath());
+            conflict.ModSources.Add(new ModDzipSource
+            {
+                ModName = mod.ModName,
+                DisplayName = mod.DisplayName,
+                DzipPath = modDzipPath,
+                ExtractedPath = extractionService.GetModFileExtractionPath(mod.ModName, dzipName)
+            });
+        }
+
+        _conflicts[conflictKey] = conflict;
+    }
+
+    // Unknown mods default to CookedPC for now
+    private static InstallLocation NormalizeInstallLocation(InstallLocation location) => location is InstallLocation.Unknown ? InstallLocation.CookedPC : location;
+
+    private static string BuildConflictKey(string dzipName, InstallLocation location) => $"{location}:{dzipName}";
 
     private async Task ExtractAndAnalyzeConflictAsync(DzipConflict conflict, CancellationToken ctx)
     {
@@ -100,11 +131,8 @@ public class ConflictDetectionService(ScriptExtractionService extractionService,
             ctx.ThrowIfCancellationRequested();
             if (!Directory.Exists(modSource.ExtractedPath))
             {
-                await extractionService.ExtractModDzipForConflictAsync(
-                    modSource.ModName,
-                    modSource.DzipPath,
-                    conflict.DzipName,
-                    ctx);
+                // Extract each mod's DZIP lazily so we only unpack archives that truly participate in a conflict
+                await extractionService.ExtractModDzipForConflictAsync(modSource.ModName, modSource.DzipPath, conflict.DzipName, ctx);
             }
         }
 
