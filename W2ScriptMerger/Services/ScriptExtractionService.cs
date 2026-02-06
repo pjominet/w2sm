@@ -72,7 +72,7 @@ public class ScriptExtractionService(ConfigService configService)
             lines.Add("");
             foreach (var script in conflict.ScriptConflicts)
             {
-                var status = script.Status == ConflictStatus.AutoResolved ? "auto" : "manual";
+                var status = script.Status is ConflictStatus.AutoResolved ? "auto" : "manual";
                 lines.Add($"- `{script.ScriptRelativePath}` ({status})");
             }
             lines.Add("");
@@ -121,8 +121,9 @@ public class ScriptExtractionService(ConfigService configService)
         }
     }
 
-    public string? PackMergedDzip(string dzipName)
+    public string? PackMergedDzip(DzipConflict conflict)
     {
+        var dzipName = conflict.DzipName;
         var mergedDir = Path.Combine(MergedScriptsPath, dzipName);
         if (!Directory.Exists(mergedDir))
             return null;
@@ -132,7 +133,7 @@ public class ScriptExtractionService(ConfigService configService)
         if (!Directory.Exists(vanillaDir))
             return null;
 
-        // Create temp folder for combined output
+        // Create a temp folder for combined output
         var packedFolder = Path.Combine(MergedScriptsPath, "packed");
         var tempCombinedDir = Path.Combine(packedFolder, $"{dzipName}_temp");
 
@@ -145,10 +146,15 @@ public class ScriptExtractionService(ConfigService configService)
         // Step 1: Copy ALL files from vanilla extraction
         DirectoryUtils.CopyDirectory(vanillaDir, tempCombinedDir);
 
-        // Step 2: Overlay merged files (overwrites vanilla versions)
+        // Step 2: Overlay ALL files from each mod participating in the conflict
+        // This ensures non-conflicting mod changes (new files or non-conflicting edits) are included
+        foreach (var modSource in conflict.ModSources.Where(modSource => Directory.Exists(modSource.ExtractedPath)))
+            DirectoryUtils.CopyDirectory(modSource.ExtractedPath, tempCombinedDir);
+
+        // Step 3: Overlay merged files (overwrites both vanilla and mod versions)
         DirectoryUtils.CopyDirectory(mergedDir, tempCombinedDir);
 
-        // Step 3: Pack the combined directory
+        // Step 4: Pack the combined directory
         var outputPath = Path.Combine(packedFolder, dzipName);
         if (File.Exists(outputPath))
             File.Delete(outputPath);

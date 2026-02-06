@@ -56,7 +56,7 @@ public class DeploymentService(ConfigService configService, ScriptExtractionServ
 
         foreach (var conflict in conflicts.Where(c => c.IsFullyMerged))
         {
-            var packedDzipPath = extractionService.PackMergedDzip(conflict.DzipName);
+            var packedDzipPath = extractionService.PackMergedDzip(conflict);
             if (packedDzipPath is null)
                 continue;
 
