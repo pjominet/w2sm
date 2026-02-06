@@ -220,6 +220,7 @@ public static class DzipService
             stream.Seek(offsetTablePosition, SeekOrigin.Begin);
             foreach (var blockOffset in blockOffsets)
                 writer.Write(blockOffset);
+            writer.Write((uint)compressedSize); // Write terminal offset (end of data)
             stream.Seek(endPosition, SeekOrigin.Begin);
 
             entries.Add(new DzipEntry
