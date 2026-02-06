@@ -90,4 +90,22 @@ public partial class MainViewModel
         var manualCount = DzipConflicts.Sum(c => c.ScriptConflicts.Count(s => s.Status == ConflictStatus.ManuallyResolved));
         ShowMergeSummary(autoCount, manualCount);
     }
+
+    [RelayCommand]
+    private async Task Unmerge()
+    {
+        try
+        {
+            _extractionService.DiscardMergedScripts();
+            HasExistingMerge = false;
+            HasPendingMergeChanges = false;
+            Log("Cleared merged output. You can now generate a new merge.");
+            StatusMessage = "Merge cleared";
+            await DetectConflictsAsync();
+        }
+        catch (Exception ex)
+        {
+            Log($"Error clearing merged output: {ex.Message}");
+        }
+    }
 }

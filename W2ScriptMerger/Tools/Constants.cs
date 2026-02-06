@@ -10,6 +10,7 @@ internal static class Constants
 
     // files names
     internal const string MERGE_SUMMARY_FILENAME = "merge_summary.md";
+    internal const string MERGE_MANIFEST_JSON_FILENAME = "merge_manifest.json";
     internal const string STAGING_LIST_FILENAME = "loaded_mods.json";
     internal const string CONFIG_FILENAME = "config.json";
     internal const string GAME_FILES_INDEX_FILENAME = "game_files.json";

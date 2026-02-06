@@ -233,6 +233,8 @@
                             Visibility="Collapsed" Margin="0,0,8,0"/>
                     <Button Content="📋 View Merge Summary" Command="{Binding ViewMergeSummaryCommand}" Style="{StaticResource SuccessButton}"
                             Visibility="{Binding HasExistingMerge, Converter={StaticResource BoolToVis}}" Margin="0,0,8,0"/>
+                    <Button Content="🧹 Clear Merge" Command="{Binding UnmergeCommand}" Style="{StaticResource DangerButton}"
+                            Visibility="{Binding HasExistingMerge, Converter={StaticResource BoolToVis}}"/>
                 </StackPanel>
 
                 <!-- Log Header -->

@@ -85,6 +85,14 @@ public partial class MainViewModel
         if (LoadedMods.Count == 0)
             return;
 
+        // Auto-discard previous merge output if the set of staged mods changed
+        if (_extractionService.InvalidateMergeIfModsChanged(LoadedMods.ToList()))
+        {
+            HasExistingMerge = false;
+            HasPendingMergeChanges = true;
+            Log("Detected changes in staged mods - discarded previous merge output. Please generate a new merge.");
+        }
+
         var conflicts = await _conflictDetectionService.DetectConflictsAsync(LoadedMods.ToList(), CancellationToken.None);
 
         _extractionService.LoadExistingMerges(conflicts);

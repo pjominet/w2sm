@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
 using W2ScriptMerger.Tools;
@@ -43,7 +44,7 @@ public class ScriptExtractionService(ConfigService configService)
     {
         EnsureMergedScriptsFolder();
 
-        var manifestPath = Path.Combine(MergedScriptsPath, Constants.MERGE_SUMMARY_FILENAME);
+        var summaryPath = Path.Combine(MergedScriptsPath, Constants.MERGE_SUMMARY_FILENAME);
         var lines = new List<string>
         {
             "# Merged Mods",
@@ -57,8 +58,9 @@ public class ScriptExtractionService(ConfigService configService)
         var modNames = conflicts
             .SelectMany(c => c.ModSources)
             .Select(s => s.ModName)
-            .Distinct()
-            .OrderBy(n => n);
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         lines.AddRange(modNames.Select(modName => $"- {modName}"));
 
@@ -78,7 +80,16 @@ public class ScriptExtractionService(ConfigService configService)
             lines.Add("");
         }
 
-        File.WriteAllLines(manifestPath, lines);
+        File.WriteAllLines(summaryPath, lines);
+
+        // JSON manifest to track included mods for auto-invalidation on changes
+        var manifestPath = Path.Combine(MergedScriptsPath, Constants.MERGE_MANIFEST_JSON_FILENAME);
+        var json = JsonSerializer.Serialize(new MergeManifest
+        {
+            GeneratedAt = DateTime.Now,
+            Mods = modNames
+        }, configService.JsonSerializerOptions);
+        File.WriteAllText(manifestPath, json);
     }
 
     public void SaveMergedScript(DzipConflict dzipConflict, ScriptFileConflict scriptConflict)
@@ -167,10 +178,51 @@ public class ScriptExtractionService(ConfigService configService)
         return outputPath;
     }
 
+    public bool InvalidateMergeIfModsChanged(IEnumerable<ModArchive> currentMods)
+    {
+        if (!Directory.Exists(MergedScriptsPath))
+            return false;
+
+        var manifestPath = Path.Combine(MergedScriptsPath, Constants.MERGE_MANIFEST_JSON_FILENAME);
+        if (!File.Exists(manifestPath))
+            return false;
+
+        try
+        {
+            var json = File.ReadAllText(manifestPath);
+            var manifest = JsonSerializer.Deserialize<MergeManifest>(json, configService.JsonSerializerOptions);
+            var previousMods = manifest?.Mods?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var currentModSet = currentMods.Select(m => m.ModName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (!previousMods.SetEquals(currentModSet))
+            {
+                DiscardMergedScripts();
+                return true;
+            }
+        }
+        catch
+        {
+            // Ignore manifest read errors; leave merge as-is
+        }
+
+        return false;
+    }
+
+    public void DiscardMergedScripts()
+    {
+        if (Directory.Exists(MergedScriptsPath))
+            Directory.Delete(MergedScriptsPath, true);
+    }
 
     public void CleanupExtractedFiles()
     {
         if (Directory.Exists(ModScriptsPath))
             Directory.Delete(ModScriptsPath, true);
+    }
+
+    private class MergeManifest
+    {
+        public DateTime GeneratedAt { get; set; }
+        public List<string>? Mods { get; set; }
     }
 }
