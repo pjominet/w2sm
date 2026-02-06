@@ -18,7 +18,7 @@ internal static class ModPathHelper
     /// <param name="rawPath">Path exactly as it was stored inside the archive.</param>
     /// <returns>
     /// The inferred <see cref="InstallLocation"/> along with a relative path that starts at the detected root.
-    /// Unknown paths are staged under CookedPC by default so they can still be surfaced to the user.
+    /// Unknown paths are staged under CookedPC by default, so they can still be surfaced to the user.
     /// </returns>
     internal static (InstallLocation Location, string RelativePathWithRoot) ResolveStagingPath(string? rawPath)
     {
@@ -37,7 +37,7 @@ internal static class ModPathHelper
 
     /// <summary>
     /// Converts a staged file path into the relative path that should be applied during deployment.
-    /// Any CookedPC/UserContent prefixes are trimmed and the result is normalized to OS-specific separators.
+    /// Any CookedPC/UserContent prefixes are trimmed, and the result is normalized to OS-specific separators.
     /// </summary>
     /// <param name="filePath">Path recorded in the mod archive metadata.</param>
     internal static string GetDeployRelativePath(string filePath)

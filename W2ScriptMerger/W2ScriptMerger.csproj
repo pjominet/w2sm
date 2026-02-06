@@ -27,6 +27,7 @@
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
         <PackageReference Include="DiffPlex" Version="1.9.0" />
         <PackageReference Include="SharpSevenZip" Version="2.0.35" ExcludeAssets="native" />
+        <PackageReference Include="UTF.Unknown" Version="2.6.0" />
     </ItemGroup>
 
     <ItemGroup>

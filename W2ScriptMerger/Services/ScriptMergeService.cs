@@ -3,6 +3,7 @@ using System.Text;
 using DiffPlex;
 using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Models;
+using EncodingExtensions = W2ScriptMerger.Extensions.EncodingExtensions;
 
 namespace W2ScriptMerger.Services;
 
@@ -82,11 +83,11 @@ public class ScriptMergeService(ScriptExtractionService extractionService)
 
     private ScriptMergeAttemptResult ThreeWayMerge(byte[] baseContent, byte[] modContent)
     {
-        var baseText = Encoding.ANSI1250.GetString(baseContent);
-        var modText = Encoding.ANSI1250.GetString(modContent);
+        var baseText = EncodingExtensions.ReadFileWithEncodingFromBytes(baseContent);
+        var modText = EncodingExtensions.ReadFileWithEncodingFromBytes(modContent);
 
-        var baseLines = baseText.Split('\n');
-        var modLines = modText.Split('\n');
+        var baseLines = baseText.Split(["\r\n", "\n"], StringSplitOptions.None);
+        var modLines = modText.Split(["\r\n", "\n"], StringSplitOptions.None);
 
         var diff = _differ.CreateLineDiffs(baseText, modText, ignoreWhitespace: false);
 
@@ -144,11 +145,16 @@ public class ScriptMergeService(ScriptExtractionService extractionService)
             if (op.InsertLines is { Count: > 0 })
             {
                 var insertIndex = Math.Min(op.Position, mergedLines.Count);
-                mergedLines.InsertRange(insertIndex, op.InsertLines);
+
+                // Check if these lines are already present at or near this position to avoid duplicates
+                // This handles cases where multiple mods add the same property/logic
+                var existingAtPos = mergedLines.Skip(insertIndex).Take(op.InsertLines.Count).ToList();
+                if (!existingAtPos.SequenceEqual(op.InsertLines))
+                    mergedLines.InsertRange(insertIndex, op.InsertLines);
             }
         }
 
-        var mergedText = string.Join('\n', mergedLines);
+        var mergedText = string.Join("\r\n", mergedLines);
         return new ScriptMergeAttemptResult
         {
             Success = true,
