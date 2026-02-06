@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.IO;
+using System.Text.Json;
 using W2ScriptMerger.Extensions;
 using W2ScriptMerger.Services;
 using W2ScriptMerger.Models;
@@ -16,7 +17,7 @@ public class MergeServiceTests : IDisposable
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         _scope = TestArtifactScope.Create(nameof(MergeServiceTests));
-        var configService = new ConfigService(new System.Text.Json.JsonSerializerOptions());
+        var configService = new ConfigService(new JsonSerializerOptions());
         var extractionService = new ScriptExtractionService(configService);
         _mergeService = new ScriptMergeService(extractionService);
     }
@@ -49,7 +50,7 @@ public class MergeServiceTests : IDisposable
         var mergedText = Encoding.ANSI1250.GetString(result.MergedContent!);
 
         Assert.Equal(1, CountOccurrences(mergedText, "var isTeleporting : bool;"));
-        Assert.Contains("Log(\"teleporting\");", (string)mergedText);
+        Assert.Contains("Log(\"teleporting\");", mergedText);
     }
 
     [Fact]

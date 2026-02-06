@@ -9,7 +9,7 @@ internal static class EncodingExtensions
 {
     extension(Encoding)
     {
-        internal static Encoding ANSI1250 => Encoding.GetEncoding(1250);
+        public static Encoding ANSI1250 => Encoding.GetEncoding(1250);
     }
 
     public static Encoding DetectEncoding(byte[] bytes)
