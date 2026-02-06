@@ -120,7 +120,9 @@ public static class DzipService
         ArgumentNullException.ThrowIfNull(stream);
         stream.Seek(entry.Offset, SeekOrigin.Begin);
 
-        // Data is not compressed, return as-is
+        // Data is not compressed at the entry level, return as-is
+        // Note: entry.CompressedSize == entry.ExpectedUncompressedSize usually means it's uncompressed,
+        // but DZIP almost always uses block-based compression even if there's only one block.
         if (entry.CompressedSize == entry.ExpectedUncompressedSize)
         {
             var rawData = new byte[entry.CompressedSize];
@@ -134,14 +136,12 @@ public static class DzipService
 
         using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true);
 
-        // Read block offset table (blockCount + 1 entries, each is uint32 relative to entry.Offset)
+        // Read the block offset table (blockCount + 1 entries, each is uint32 relative to entry.Offset)
         var offsets = new long[blockCount + 1];
         for (var i = 0; i <= blockCount; i++)
         {
             offsets[i] = entry.Offset + reader.ReadUInt32();
         }
-        // Last offset is the end of compressed data
-        offsets[blockCount] = entry.Offset + entry.CompressedSize;
 
         var output = new byte[entry.ExpectedUncompressedSize];
         var outputPosition = 0;
@@ -150,18 +150,30 @@ public static class DzipService
 
         for (var i = 0; i < blockCount; i++)
         {
-            var blockCompressedSize = (int)(offsets[i + 1] - offsets[i]);
-            var compressedBlock = new byte[blockCompressedSize];
-
+            var blockCompressedSizeWithHeader = (int)(offsets[i + 1] - offsets[i]);
             stream.Seek(offsets[i], SeekOrigin.Begin);
-            stream.ReadExactly(compressedBlock, 0, blockCompressedSize);
 
-            var decompressedSize = Lzf.Decompress(compressedBlock, uncompressedBlock);
+            var isCompressed = reader.ReadByte();
+            var dataSize = blockCompressedSizeWithHeader - 1;
 
-            var bytesToCopy = (int)Math.Min(remaining, decompressedSize);
-            Array.Copy(uncompressedBlock, 0, output, outputPosition, bytesToCopy);
-            outputPosition += bytesToCopy;
-            remaining -= bytesToCopy;
+            var data = new byte[dataSize];
+            stream.ReadExactly(data, 0, dataSize);
+
+            if (isCompressed == 1)
+            {
+                var decompressedSize = Lzf.Decompress(data, uncompressedBlock);
+                var bytesToCopy = (int)Math.Min(remaining, decompressedSize);
+                Array.Copy(uncompressedBlock, 0, output, outputPosition, bytesToCopy);
+                outputPosition += bytesToCopy;
+                remaining -= bytesToCopy;
+            }
+            else
+            {
+                var bytesToCopy = (int)Math.Min(remaining, dataSize);
+                Array.Copy(data, 0, output, outputPosition, bytesToCopy);
+                outputPosition += bytesToCopy;
+                remaining -= bytesToCopy;
+            }
         }
 
         return output;
@@ -193,8 +205,9 @@ public static class DzipService
             var offset = stream.Position;
             var blockCount = (fileData.Length + blockSize - 1) / blockSize;
 
-            // Reserve space for offset table
+            // Reserve space for the offset table
             var offsetTablePosition = stream.Position;
+            var offsetTableSize = (blockCount + 1) * 4;
             for (var i = 0; i <= blockCount; i++)
                 writer.Write(0u); // placeholder
 
@@ -210,7 +223,18 @@ public static class DzipService
                 Array.Copy(fileData, blockStart, blockData, 0, blockLength);
 
                 var compressedBlock = Lzf.Compress(blockData);
-                stream.Write(compressedBlock, 0, compressedBlock.Length);
+
+                // Witcher 2 LZF block format: [1 byte: 1=compressed, 0=raw] [compressed/raw data]
+                if (compressedBlock.Length + 1 < blockData.Length)
+                {
+                    writer.Write((byte)1);
+                    stream.Write(compressedBlock, 0, compressedBlock.Length);
+                }
+                else
+                {
+                    writer.Write((byte)0);
+                    stream.Write(blockData, 0, blockData.Length);
+                }
             }
 
             var compressedSize = stream.Position - offset;
